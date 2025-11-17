@@ -28,7 +28,7 @@ const badmintonBoard = (() => {
     });
   };
   normalizeParticipants();
-  const NAME_RESET_HOLD_DURATION = 3000;
+  const NAME_RESET_HOLD_DURATION = 2000;
   const SHUTTLE_IMAGE = './assets/image/shuttlecock.png';
   const STORAGE_KEY = 'badmintonBoardState';
   const history = {};
@@ -609,11 +609,11 @@ const badmintonBoard = (() => {
     card.id = `wait-card-${waitlistCardSeq++}`;
     card.dataset.participantId = member.id;
     card.dataset.previousSlotId = '';
+    attachNameResetHold(card, member.id);
 
     const nameEl = document.createElement('div');
     nameEl.className = 'name';
     nameEl.textContent = member.name;
-    attachNameResetHold(nameEl, member.id);
 
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
@@ -850,6 +850,7 @@ const badmintonBoard = (() => {
     card.dataset.participantId = member.id;
     const color = member.color || 'blue';
     card.dataset.color = color;
+    attachNameResetHold(card, member.id);
 
     const meta = document.createElement('div');
     meta.className = 'meta';
@@ -863,7 +864,6 @@ const badmintonBoard = (() => {
     const nameEl = document.createElement('div');
     nameEl.className = 'name';
     nameEl.textContent = member.name;
-    attachNameResetHold(nameEl, member.id);
 
     const statsEl = document.createElement('div');
     statsEl.className = 'today-count';
@@ -910,6 +910,7 @@ const badmintonBoard = (() => {
     card.dataset.previousSlotId = '';
     const color = member.color || 'blue';
     card.dataset.color = color;
+    attachNameResetHold(card, member.id);
 
     const meta = document.createElement('div');
     meta.className = 'meta';
