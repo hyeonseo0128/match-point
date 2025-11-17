@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>매치포인트 게임판</title>
+  <link rel="stylesheet" href="./styles/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand" aria-label="우리 모임 로고">
+      <img src="./assets/image/match_point_logo.png" alt="우리 모임 로고" class="brand-logo" />
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="board-layout">
+      <section class="board-area" aria-label="게임판 영역">
+        <div class="board-header">
+          <div>
+            <h2>배드민턴 코트</h2>
+            <p>코트를 추가하고 참가자를 드래그해서 원하는 위치에 배치하세요.</p>
+          </div>
+        <div class="board-actions">
+          <button id="addCourtBtn" class="btn secondary" type="button">코트 추가</button>
+          <button id="resetBoardBtn" class="btn" type="button">배치 초기화</button>
+        </div>
+      </div>
+      <div class="game-board" id="gameBoard" aria-label="게임판"></div>
+      <div class="waitlist-area" aria-label="배드민턴 코트 대기자 목록">
+        <div class="waitlist-header">
+          <div>
+            <h3>대기순서</h3>
+            <p>회원 목록의 카드를 끌어 놓아 4명씩 대기라인을 채우고 필요할 때 라인을 추가하거나 제거하세요.</p>
+          </div>
+          <div class="waitlist-actions">
+            <button id="addWaitlistRowBtn" class="btn secondary" type="button">대기 라인 추가</button>
+          </div>
+        </div>
+        <div id="waitlistRows" class="waitlist-rows" aria-live="polite"></div>
+      </div>
+      <p class="board-hint">추가한 코트 위 아무 곳이나 카드를 내려놓으면 배치됩니다.</p>
+      </section>
+
+      <section class="participants-section" aria-label="멤버 목록">
+        <div class="participants-header">
+          <h2>회원 목록</h2>
+          <button id="hardResetBtn" class="btn danger" type="button">전체 초기화</button>
+        </div>
+        <p class="section-description">필요한 위치에 끌어 놓고, 다시 목록으로 가져오고 싶다면 이 영역에 드롭하세요.</p>
+
+        <div class="participant-controls">
+          <div class="field-group">
+            <label for="participantNameInput">이름</label>
+            <input id="participantNameInput" type="text" placeholder="참가자 이름을 입력하세요" autocomplete="off" />
+          </div>
+
+          <div class="field-group color-picker">
+            <span class="field-label">멤버 구분</span>
+            <div class="color-options" role="radiogroup" aria-label="카드 색상 선택">
+              <label class="color-chip blue">
+                <input type="radio" name="participantColor" value="blue" checked />
+                <span class="chip-visual">남 자</span>
+              </label>
+              <label class="color-chip pink">
+                <input type="radio" name="participantColor" value="pink" />
+                <span class="chip-visual">여 자</span>
+              </label>
+              <label class="color-chip orange">
+                <input type="radio" name="participantColor" value="orange" />
+                <span class="chip-visual">게스트</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="participant-cta">
+          <button id="addParticipantBtn" class="btn" type="button">참가자 추가</button>
+        </div>
+
+        <div id="participantsList" class="participants-list" aria-live="polite"></div>
+      </section>
+    </div>
+  </main>
+
+  <script src="./scripts/app.js" defer></script>
+</body>
+</html>
