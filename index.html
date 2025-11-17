@@ -47,7 +47,6 @@
         <div class="participants-header">
           <h2>회원 목록</h2>
           <div class="participants-actions">
-            <button id="downloadHistoryBtn" class="btn ghost" type="button">오늘 히스토리 저장</button>
             <button id="hardResetBtn" class="btn danger" type="button">전체 초기화</button>
           </div>
         </div>
@@ -83,9 +82,47 @@
         </div>
 
         <div id="participantsList" class="participants-list" aria-live="polite"></div>
+
+        <div class="history-download-cta">
+          <button id="downloadHistoryBtn" class="btn ghost" type="button">오늘 히스토리 저장</button>
+        </div>
       </section>
     </div>
   </main>
+
+  <div id="participantDetailModal" class="participant-modal" aria-hidden="true">
+    <div class="participant-modal-backdrop" data-modal-action="close"></div>
+    <div class="participant-modal-panel" role="dialog" aria-modal="true" aria-labelledby="participantDetailName">
+      <header class="participant-modal-header">
+        <div>
+          <p class="participant-modal-label">회원 정보</p>
+          <h3 id="participantDetailName" class="participant-modal-title"></h3>
+        </div>
+        <button type="button" class="participant-modal-close" id="participantDetailCloseBtn" aria-label="닫기">&times;</button>
+      </header>
+      <div class="participant-modal-body">
+        <dl class="participant-modal-stats">
+          <div class="participant-modal-stat">
+            <dt>오늘 도착</dt>
+            <dd id="participantDetailArrival">기록 없음</dd>
+          </div>
+          <div class="participant-modal-stat">
+            <dt>오늘 게임 횟수</dt>
+            <dd>
+              <div class="participant-detail-count-editor">
+                <button type="button" class="count-editor-btn" id="participantDetailCountDecrease" aria-label="오늘 게임 횟수 1 감소">-</button>
+                <input type="number" id="participantDetailCountInput" min="0" inputmode="numeric" aria-label="오늘 게임 횟수 입력" />
+                <button type="button" class="count-editor-btn" id="participantDetailCountIncrease" aria-label="오늘 게임 횟수 1 증가">+</button>
+              </div>
+            </dd>
+          </div>
+        </dl>
+      </div>
+      <footer class="participant-modal-footer">
+        <button type="button" class="btn" id="participantDetailSaveBtn">저장</button>
+      </footer>
+    </div>
+  </div>
 
   <script src="./scripts/app.js" defer></script>
 </body>

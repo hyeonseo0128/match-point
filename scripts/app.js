@@ -1,21 +1,21 @@
 const badmintonBoard = (() => {
   const participants = [
-    { id: 'p1', name: '오승준', color: 'blue' },
-    { id: 'p2', name: '강소정', color: 'pink' },
-    { id: 'p3', name: '김병찬', color: 'blue' },
-    { id: 'p4', name: '장호철', color: 'blue' },
-    { id: 'p5', name: '정상현', color: 'blue' },
-    { id: 'p6', name: '조소영', color: 'pink' },
-    { id: 'p7', name: '최원식', color: 'blue' },
-    { id: 'p8', name: '손현서', color: 'blue' },
-    { id: 'p9', name: '박준희', color: 'blue' },
-    { id: 'p10', name: '게스트', color: 'orange' },
-    { id: 'p11', name: '류진희', color: 'pink' },
-    { id: 'p12', name: '박영경', color: 'pink' },
-    { id: 'p13', name: '김회연', color: 'blue' },
-    { id: 'p14', name: '원채령', color: 'pink' },
-    { id: 'p15', name: '이광재', color: 'blue' },
-    { id: 'p16', name: '채종일', color: 'blue' },
+    // { id: 'p1', name: '오승준', color: 'blue' },
+    // { id: 'p2', name: '강소정', color: 'pink' },
+    // { id: 'p3', name: '김병찬', color: 'blue' },
+    // { id: 'p4', name: '장호철', color: 'blue' },
+    // { id: 'p5', name: '정상현', color: 'blue' },
+    // { id: 'p6', name: '조소영', color: 'pink' },
+    // { id: 'p7', name: '최원식', color: 'blue' },
+    // { id: 'p8', name: '손현서', color: 'blue' },
+    // { id: 'p9', name: '박준희', color: 'blue' },
+    // { id: 'p10', name: '게스트', color: 'orange' },
+    // { id: 'p11', name: '류진희', color: 'pink' },
+    // { id: 'p12', name: '박영경', color: 'pink' },
+    // { id: 'p13', name: '김회연', color: 'blue' },
+    // { id: 'p14', name: '원채령', color: 'pink' },
+    // { id: 'p15', name: '이광재', color: 'blue' },
+    // { id: 'p16', name: '채종일', color: 'blue' },
   ];
   participants.forEach((member) => {
     member.status = member.status || 'pending';
@@ -44,6 +44,15 @@ const badmintonBoard = (() => {
   let downloadHistoryBtn;
   let waitlistRowsEl;
   let addWaitlistRowBtn;
+  let participantDetailModal;
+  let participantDetailNameEl;
+  let participantDetailArrivalEl;
+  let participantDetailCountInput;
+  let participantDetailSaveBtn;
+  let participantDetailCloseBtn;
+  let participantDetailCountIncreaseBtn;
+  let participantDetailCountDecreaseBtn;
+  let activeDetailParticipantId = null;
   const usedCourtNumbers = new Set();
   let courtCount = 0;
   let boardCardSeq = 0;
@@ -64,6 +73,14 @@ const badmintonBoard = (() => {
     addWaitlistRowBtn = document.getElementById('addWaitlistRowBtn');
     hardResetBtn = document.getElementById('hardResetBtn');
     downloadHistoryBtn = document.getElementById('downloadHistoryBtn');
+    participantDetailModal = document.getElementById('participantDetailModal');
+    participantDetailNameEl = document.getElementById('participantDetailName');
+    participantDetailArrivalEl = document.getElementById('participantDetailArrival');
+    participantDetailCountInput = document.getElementById('participantDetailCountInput');
+    participantDetailSaveBtn = document.getElementById('participantDetailSaveBtn');
+    participantDetailCloseBtn = document.getElementById('participantDetailCloseBtn');
+    participantDetailCountIncreaseBtn = document.getElementById('participantDetailCountIncrease');
+    participantDetailCountDecreaseBtn = document.getElementById('participantDetailCountDecrease');
 
     if (!boardEl || !participantsListEl) return;
 
@@ -107,6 +124,7 @@ const badmintonBoard = (() => {
       }
     });
     bindWaitlistReorderEvents();
+    bindParticipantDetailModal();
   };
 
   const bindWaitlistReorderEvents = () => {
@@ -114,6 +132,88 @@ const badmintonBoard = (() => {
     waitlistRowsEl.addEventListener('dragover', handleWaitlistRowDragOver);
     waitlistRowsEl.addEventListener('dragleave', handleWaitlistRowDragLeave);
     waitlistRowsEl.addEventListener('drop', handleWaitlistRowContainerDrop);
+  };
+
+  const bindParticipantDetailModal = () => {
+    if (!participantDetailModal) return;
+    participantDetailModal.addEventListener('click', (event) => {
+      const action = event.target?.dataset?.modalAction;
+      if (action === 'close') {
+        closeParticipantDetail();
+      }
+    });
+    participantDetailCloseBtn?.addEventListener('click', closeParticipantDetail);
+    participantDetailSaveBtn?.addEventListener('click', handleParticipantDetailSave);
+    participantDetailCountIncreaseBtn?.addEventListener('click', () => adjustParticipantDetailCount(1));
+    participantDetailCountDecreaseBtn?.addEventListener('click', () => adjustParticipantDetailCount(-1));
+    participantDetailCountInput?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        handleParticipantDetailSave();
+      }
+    });
+    document.addEventListener('keydown', handleParticipantDetailKeydown);
+  };
+
+  const handleParticipantDetailKeydown = (event) => {
+    if (event.key !== 'Escape') return;
+    if (!participantDetailModal?.classList.contains('is-open')) return;
+    event.preventDefault();
+    closeParticipantDetail();
+  };
+
+  const getDetailCountInputValue = () => {
+    if (!participantDetailCountInput) return 0;
+    return normalizeCountValue(participantDetailCountInput.value);
+  };
+
+  const setDetailCountInputValue = (value) => {
+    if (!participantDetailCountInput) return;
+    const normalized = normalizeCountValue(value);
+    participantDetailCountInput.value = String(normalized);
+  };
+
+  const adjustParticipantDetailCount = (delta) => {
+    const nextValue = getDetailCountInputValue() + delta;
+    setDetailCountInputValue(nextValue);
+  };
+
+  const openParticipantDetail = (participantId) => {
+    if (!participantDetailModal) return;
+    const participant = getParticipantById(participantId);
+    if (!participant) return;
+    activeDetailParticipantId = participantId;
+    participantDetailModal.classList.add('is-open');
+    participantDetailModal.setAttribute('aria-hidden', 'false');
+    if (participantDetailNameEl) {
+      participantDetailNameEl.textContent = participant.name;
+    }
+    const session = getParticipantTodaySession(participantId);
+    setDetailCountInputValue(session?.count || 0);
+    if (participantDetailArrivalEl) {
+      const arrivalLabel = formatArrivalTime(session?.joinedAt || null);
+      participantDetailArrivalEl.textContent = arrivalLabel;
+    }
+    participantDetailCountInput?.focus();
+    participantDetailCountInput?.select();
+  };
+
+  const closeParticipantDetail = () => {
+    if (!participantDetailModal) return;
+    participantDetailModal.classList.remove('is-open');
+    participantDetailModal.setAttribute('aria-hidden', 'true');
+    activeDetailParticipantId = null;
+  };
+
+  const handleParticipantDetailSave = () => {
+    if (!activeDetailParticipantId) {
+      closeParticipantDetail();
+      return;
+    }
+    const count = getDetailCountInputValue();
+    setParticipantTodayCount(activeDetailParticipantId, count);
+    schedulePersist();
+    closeParticipantDetail();
   };
 
   const handleWaitlistRowDragOver = (event) => {
@@ -193,15 +293,62 @@ const badmintonBoard = (() => {
     schedulePersist();
   };
 
-  const incrementParticipantGameCount = (participantId) => {
+  const normalizeCountValue = (value) => {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) return 0;
+    return Math.max(0, Math.floor(numericValue));
+  };
+
+  const getParticipantSessionForDate = (participantId, dateKey = null) => {
     const participant = getParticipantById(participantId);
-    if (!participant) return;
+    if (!participant) return null;
+    const targetDate = dateKey || getTodayKey();
     participant.sessions = participant.sessions || {};
+    let entry = participant.sessions[targetDate];
+    if (typeof entry === 'number') {
+      entry = { count: normalizeCountValue(entry), joinedAt: null };
+    } else if (!entry || typeof entry !== 'object') {
+      entry = { count: 0, joinedAt: null };
+    } else {
+      entry.count = normalizeCountValue(entry.count);
+      entry.joinedAt = entry.joinedAt || null;
+    }
+    participant.sessions[targetDate] = entry;
+    return entry;
+  };
+
+  const getParticipantTodaySession = (participantId) => getParticipantSessionForDate(participantId);
+
+  const setParticipantTodayCount = (participantId, requestedCount) => {
+    const session = getParticipantTodaySession(participantId);
+    if (!session) return 0;
+    const normalized = normalizeCountValue(requestedCount);
+    session.count = normalized;
     const today = getTodayKey();
-    participant.sessions[today] = (participant.sessions[today] || 0) + 1;
     history[today] = history[today] || {};
-    history[today][participantId] = (history[today][participantId] || 0) + 1;
+    history[today][participantId] = normalized;
     updateParticipantStatsDisplay(participantId);
+    return normalized;
+  };
+
+  const incrementParticipantGameCount = (participantId) => {
+    const session = getParticipantTodaySession(participantId);
+    if (!session) return;
+    setParticipantTodayCount(participantId, session.count + 1);
+  };
+
+  const setParticipantJoinedAt = (participantId, timestamp = new Date()) => {
+    const session = getParticipantTodaySession(participantId);
+    if (!session) return null;
+    if (!session.joinedAt) {
+      session.joinedAt = typeof timestamp === 'string' ? timestamp : timestamp.toISOString();
+    }
+    return session.joinedAt;
+  };
+
+  const getParticipantJoinedAt = (participantId) => {
+    const session = getParticipantTodaySession(participantId);
+    return session?.joinedAt || null;
   };
 
   const syncParticipantCards = (participantId) => {
@@ -351,14 +498,24 @@ const badmintonBoard = (() => {
   };
 
   const getParticipantTodayCount = (participantId) => {
-    const participant = getParticipantById(participantId);
-    if (!participant) return 0;
-    participant.sessions = participant.sessions || {};
-    const today = getTodayKey();
-    return participant.sessions[today] || 0;
+    const session = getParticipantTodaySession(participantId);
+    return session?.count || 0;
   };
 
   const formatTodayCount = (count) => `오늘 ${count}게임`;
+
+  const formatArrivalTime = (timestamp) => {
+    if (!timestamp) return '기록 없음';
+    try {
+      const date = new Date(timestamp);
+      if (Number.isNaN(date.getTime())) {
+        return '기록 없음';
+      }
+      return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+    } catch {
+      return '기록 없음';
+    }
+  };
 
   const updateParticipantStatsDisplay = (participantId) => {
     const count = getParticipantTodayCount(participantId);
@@ -903,6 +1060,7 @@ const badmintonBoard = (() => {
     card.addEventListener('dragend', () => {
       card.classList.remove('dragging');
     });
+    card.addEventListener('click', () => openParticipantDetail(member.id));
 
     return card;
   };
@@ -950,6 +1108,7 @@ const badmintonBoard = (() => {
 
     card.addEventListener('dragstart', (event) => handleBoardDragStart(event, card));
     card.addEventListener('dragend', () => handleBoardDragEnd(card));
+    card.addEventListener('click', () => openParticipantDetail(member.id));
 
     return card;
   };
@@ -1048,6 +1207,7 @@ const badmintonBoard = (() => {
     };
     participants.push(newParticipant);
     participantsListEl.appendChild(createListCard(newParticipant));
+    setParticipantJoinedAt(newParticipant.id, new Date());
     participantNameInput.value = '';
     participantNameInput.focus();
     schedulePersist();
