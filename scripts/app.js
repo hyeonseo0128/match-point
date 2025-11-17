@@ -783,19 +783,25 @@ const badmintonBoard = (() => {
   const handleCourtGameComplete = (court) => {
     if (!court) return;
     const slots = [...court.querySelectorAll('.slot')];
-    const participantIds = slots
+    const participants = slots
       .map((slot) => {
         const occupantId = slot.dataset.occupantId;
         if (!occupantId) return null;
         const card = document.getElementById(occupantId);
-        return card?.dataset.participantId || null;
+        if (!card) return null;
+        const participantId = card.dataset.participantId;
+        if (!participantId) return null;
+        return { participantId, card };
       })
       .filter(Boolean);
-    if (!participantIds.length) {
+    if (!participants.length) {
       window.alert('이 코트에 배치된 멤버가 없습니다.');
       return;
     }
-    participantIds.forEach((participantId) => incrementParticipantGameCount(participantId));
+    participants.forEach(({ participantId, card }) => {
+      incrementParticipantGameCount(participantId);
+      removeBoardCard(card);
+    });
     schedulePersist();
   };
 
