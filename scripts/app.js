@@ -19,10 +19,19 @@ const badmintonBoard = (() => {
   ];
   participants.forEach((member) => {
     member.status = member.status || 'pending';
+    member.sessions = member.sessions || {};
   });
-  const NAME_RESET_HOLD_DURATION = 2000;
-  const SHUTTLE_IMAGE = './assets/image/shuttlecock.jpg';
+  const normalizeParticipants = () => {
+    participants.forEach((member) => {
+      member.status = member.status || 'pending';
+      member.sessions = member.sessions || {};
+    });
+  };
+  normalizeParticipants();
+  const NAME_RESET_HOLD_DURATION = 3000;
+  const SHUTTLE_IMAGE = './assets/image/shuttlecock.png';
   const STORAGE_KEY = 'badmintonBoardState';
+  const history = {};
   let isRestoringState = false;
   let saveTimer = null;
   let boardEl;
@@ -32,6 +41,7 @@ const badmintonBoard = (() => {
   let participantNameInput;
   let addParticipantBtn;
   let hardResetBtn;
+  let downloadHistoryBtn;
   let waitlistRowsEl;
   let addWaitlistRowBtn;
   const usedCourtNumbers = new Set();
@@ -53,6 +63,7 @@ const badmintonBoard = (() => {
     waitlistRowsEl = document.getElementById('waitlistRows');
     addWaitlistRowBtn = document.getElementById('addWaitlistRowBtn');
     hardResetBtn = document.getElementById('hardResetBtn');
+    downloadHistoryBtn = document.getElementById('downloadHistoryBtn');
 
     if (!boardEl || !participantsListEl) return;
 
@@ -61,6 +72,15 @@ const badmintonBoard = (() => {
       participants.length = 0;
       savedState.participants.forEach((member) => {
         participants.push({ ...member });
+      });
+    }
+    normalizeParticipants();
+    if (savedState?.history) {
+      Object.keys(history).forEach((key) => {
+        delete history[key];
+      });
+      Object.entries(savedState.history).forEach(([key, value]) => {
+        history[key] = value;
       });
     }
     renderParticipants();
@@ -78,6 +98,7 @@ const badmintonBoard = (() => {
     resetBtn?.addEventListener('click', resetBoardPositions);
     addParticipantBtn?.addEventListener('click', handleAddParticipant);
     addWaitlistRowBtn?.addEventListener('click', handleAddWaitlistRow);
+    downloadHistoryBtn?.addEventListener('click', handleDownloadHistory);
     hardResetBtn?.addEventListener('click', handleHardReset);
     participantNameInput?.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
@@ -120,12 +141,18 @@ const badmintonBoard = (() => {
   const handleWaitlistRowContainerDrop = (event) => {
     const payload = parseDragPayload(event);
     if (!payload || payload.source !== 'waitlistRow') return;
-    const targetRow = event.target.closest('.waitlist-row');
+    const container = waitlistRowsEl;
+    if (!container) return;
+    let targetRow = event.target.closest('.waitlist-row');
     const draggedRow = document.querySelector(`.waitlist-row[data-row-id="${payload.rowId}"]`);
     clearWaitlistDropHighlight();
-    if (!draggedRow || !targetRow || draggedRow === targetRow) return;
+    if (!draggedRow) return;
     event.preventDefault();
-    targetRow.parentElement.insertBefore(draggedRow, targetRow);
+    if (!targetRow || draggedRow === targetRow) {
+      container.appendChild(draggedRow);
+    } else {
+      container.insertBefore(draggedRow, targetRow);
+    }
     refreshWaitlistRowLabels();
     schedulePersist();
   };
@@ -142,6 +169,7 @@ const badmintonBoard = (() => {
     participants.forEach((member) => {
       participantsListEl.appendChild(createListCard(member));
     });
+    updateAllParticipantStats();
   };
 
   const getParticipantStatus = (participantId) => {
@@ -163,6 +191,17 @@ const badmintonBoard = (() => {
     participant.status = 'pending';
     syncParticipantCards(participantId);
     schedulePersist();
+  };
+
+  const incrementParticipantGameCount = (participantId) => {
+    const participant = getParticipantById(participantId);
+    if (!participant) return;
+    participant.sessions = participant.sessions || {};
+    const today = getTodayKey();
+    participant.sessions[today] = (participant.sessions[today] || 0) + 1;
+    history[today] = history[today] || {};
+    history[today][participantId] = (history[today][participantId] || 0) + 1;
+    updateParticipantStatsDisplay(participantId);
   };
 
   const syncParticipantCards = (participantId) => {
@@ -267,11 +306,70 @@ const badmintonBoard = (() => {
     window.location.reload();
   };
 
+  const handleDownloadHistory = () => {
+    const today = getTodayKey();
+    const todayHistory = history[today];
+    if (!todayHistory || !Object.keys(todayHistory).length) {
+      window.alert('오늘 기록이 없습니다.');
+      return;
+    }
+    const output = {};
+    Object.entries(todayHistory).forEach(([participantId, count]) => {
+      const participant = getParticipantById(participantId);
+      const name = participant?.name || participantId;
+      output[name] = count;
+    });
+    try {
+      const blob = new Blob([JSON.stringify(output, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${today}-history.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('히스토리를 저장하지 못했습니다.', error);
+      window.alert('히스토리를 저장하지 못했습니다.');
+    }
+  };
+
   const schedulePersist = () => {
     if (isRestoringState) return;
     if (typeof window === 'undefined') return;
     window.clearTimeout(saveTimer);
     saveTimer = window.setTimeout(persistState, 200);
+  };
+
+  const getTodayKey = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getParticipantTodayCount = (participantId) => {
+    const participant = getParticipantById(participantId);
+    if (!participant) return 0;
+    participant.sessions = participant.sessions || {};
+    const today = getTodayKey();
+    return participant.sessions[today] || 0;
+  };
+
+  const formatTodayCount = (count) => `오늘 ${count}게임`;
+
+  const updateParticipantStatsDisplay = (participantId) => {
+    const count = getParticipantTodayCount(participantId);
+    const nodes = document.querySelectorAll(`.card[data-participant-id="${participantId}"] .today-count`);
+    nodes.forEach((node) => {
+      node.textContent = formatTodayCount(count);
+    });
+  };
+
+  const updateAllParticipantStats = () => {
+    participants.forEach((member) => updateParticipantStatsDisplay(member.id));
   };
 
   const persistState = () => {
@@ -286,14 +384,16 @@ const badmintonBoard = (() => {
 
   const buildState = () => {
     const state = {
-      participants: participants.map(({ id, name, color, status }) => ({
+      participants: participants.map(({ id, name, color, status, sessions }) => ({
         id,
         name,
         color,
         status,
+        sessions: sessions ? { ...sessions } : {},
       })),
       courts: [],
       waitlist: [],
+      history: JSON.parse(JSON.stringify(history)),
     };
 
     if (boardEl) {
@@ -680,6 +780,25 @@ const badmintonBoard = (() => {
     }
   };
 
+  const handleCourtGameComplete = (court) => {
+    if (!court) return;
+    const slots = [...court.querySelectorAll('.slot')];
+    const participantIds = slots
+      .map((slot) => {
+        const occupantId = slot.dataset.occupantId;
+        if (!occupantId) return null;
+        const card = document.getElementById(occupantId);
+        return card?.dataset.participantId || null;
+      })
+      .filter(Boolean);
+    if (!participantIds.length) {
+      window.alert('이 코트에 배치된 멤버가 없습니다.');
+      return;
+    }
+    participantIds.forEach((participantId) => incrementParticipantGameCount(participantId));
+    schedulePersist();
+  };
+
   const handleWaitlistRowDropOnCourt = (payload, court, preferredSlot = null) => {
     if (!payload || !Array.isArray(payload.participants) || !court) return;
     const row = document.querySelector(`.waitlist-row[data-row-id="${payload.rowId}"]`);
@@ -738,10 +857,21 @@ const badmintonBoard = (() => {
     const infoRow = document.createElement('div');
     infoRow.className = 'card-info';
 
+    const nameBlock = document.createElement('div');
+    nameBlock.className = 'name-block';
+
     const nameEl = document.createElement('div');
     nameEl.className = 'name';
     nameEl.textContent = member.name;
     attachNameResetHold(nameEl, member.id);
+
+    const statsEl = document.createElement('div');
+    statsEl.className = 'today-count';
+    statsEl.dataset.participantStats = member.id;
+    statsEl.textContent = formatTodayCount(getParticipantTodayCount(member.id));
+
+    nameBlock.appendChild(nameEl);
+    nameBlock.appendChild(statsEl);
 
     const actions = document.createElement('div');
     actions.className = 'card-actions';
@@ -755,7 +885,7 @@ const badmintonBoard = (() => {
     actions.appendChild(shuttleBtn);
     actions.appendChild(deleteBtn);
 
-    infoRow.appendChild(nameEl);
+    infoRow.appendChild(nameBlock);
     infoRow.appendChild(actions);
 
     meta.appendChild(infoRow);
@@ -994,7 +1124,14 @@ const badmintonBoard = (() => {
       }
     });
 
+    const completeBtn = document.createElement('button');
+    completeBtn.type = 'button';
+    completeBtn.className = 'court-complete';
+    completeBtn.textContent = '게임 완료';
+    completeBtn.addEventListener('click', () => handleCourtGameComplete(court));
+
     court.appendChild(label);
+    court.appendChild(completeBtn);
     court.appendChild(removeBtn);
 
     const slotsWrapper = document.createElement('div');
