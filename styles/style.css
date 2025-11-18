@@ -212,6 +212,9 @@ body{
 .waitlist-row-title:active{
   cursor:grabbing;
 }
+.waitlist-row-title.waitlist-row-title-active{
+  color:var(--primary);
+}
 .waitlist-row-header-actions{
   display:flex;
   align-items:center;
@@ -256,6 +259,65 @@ body{
 .waitlist-slot-active{
   border-color:rgba(59,130,246,0.85);
   background:rgba(59,130,246,0.14);
+}
+.waitlist-row-court-menu{
+  display:none;
+  flex-direction:column;
+  gap:8px;
+  margin:8px 0 12px;
+  padding:12px;
+  border-radius:14px;
+  border:1px dashed rgba(15,23,42,0.15);
+  background:rgba(248,250,252,0.95);
+}
+.waitlist-row-court-menu.is-open{
+  display:flex;
+}
+.waitlist-row-court-menu-label{
+  margin:0;
+  font-size:.85rem;
+  font-weight:600;
+  color:var(--headline);
+}
+.waitlist-row-court-menu-hint{
+  margin:0;
+  font-size:.8rem;
+  color:var(--muted);
+}
+.waitlist-row-court-menu-hint.is-disabled{
+  opacity:.7;
+}
+.waitlist-row-court-menu-list{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.waitlist-row-court-option{
+  border-radius:999px;
+  border:1px solid rgba(15,23,42,0.18);
+  padding:6px 12px;
+  font-size:.85rem;
+  background:#fff;
+  cursor:pointer;
+  transition:color .15s ease,border-color .15s ease,background .15s ease;
+}
+.waitlist-row-court-option:hover:not(:disabled){
+  border-color:rgba(59,130,246,0.6);
+  color:rgba(59,130,246,0.95);
+  background:rgba(59,130,246,0.08);
+}
+.waitlist-row-court-option:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+}
+.waitlist-row-court-menu-empty{
+  margin:0;
+  font-size:.8rem;
+  color:var(--muted);
+  display:none;
+}
+.waitlist-row-court-menu-empty.is-visible{
+  display:block;
 }
 .wait-card{
   width:100%;

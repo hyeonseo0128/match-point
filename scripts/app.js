@@ -71,6 +71,7 @@ const badmintonBoard = (() => {
   let slotPickerListEl;
   let slotPickerEmptyMessageEl;
   let slotPickerActiveSlot = null;
+  let activeWaitlistCourtMenu = null;
 
   const getParticipantById = (id) => participants.find((member) => member.id === id);
 
@@ -143,6 +144,8 @@ const badmintonBoard = (() => {
     bindWaitlistReorderEvents();
     bindParticipantDetailModal();
     initSlotParticipantPicker();
+    document.addEventListener('click', handleWaitlistCourtMenuDocumentClick);
+    document.addEventListener('keydown', handleWaitlistCourtMenuKeydown);
   };
 
   const bindWaitlistReorderEvents = () => {
@@ -307,6 +310,157 @@ const badmintonBoard = (() => {
     if (currentWaitlistDropTarget) {
       currentWaitlistDropTarget.classList.remove('waitlist-row-drop-target');
       currentWaitlistDropTarget = null;
+    }
+  };
+
+  const handleWaitlistRowTitleClick = (event, row, trigger) => {
+    if (!row || !trigger) return;
+    if (row.classList.contains('waitlist-row-dragging')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    toggleWaitlistCourtMenu(row, trigger);
+  };
+
+  const handleWaitlistRowTitleKeydown = (event, row, trigger) => {
+    if (!row || !trigger) return;
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    toggleWaitlistCourtMenu(row, trigger);
+  };
+
+  const toggleWaitlistCourtMenu = (row, trigger) => {
+    if (!row || !trigger) return;
+    if (activeWaitlistCourtMenu?.row === row) {
+      closeWaitlistCourtMenu(row);
+    } else {
+      openWaitlistCourtMenu(row, trigger);
+    }
+  };
+
+  const openWaitlistCourtMenu = (row, trigger) => {
+    if (!row) return;
+    closeWaitlistCourtMenu();
+    const menu = ensureWaitlistCourtMenu(row);
+    renderWaitlistCourtMenu(row, menu);
+    menu.classList.add('is-open');
+    menu.setAttribute('aria-hidden', 'false');
+    trigger?.classList.add('waitlist-row-title-active');
+    trigger?.setAttribute('aria-expanded', 'true');
+    activeWaitlistCourtMenu = { row, menu, trigger };
+  };
+
+  const closeWaitlistCourtMenu = (targetRow = null) => {
+    if (!activeWaitlistCourtMenu) return;
+    if (targetRow && activeWaitlistCourtMenu.row !== targetRow) return;
+    const { menu, trigger } = activeWaitlistCourtMenu;
+    menu?.classList.remove('is-open');
+    menu?.setAttribute('aria-hidden', 'true');
+    trigger?.classList.remove('waitlist-row-title-active');
+    trigger?.setAttribute('aria-expanded', 'false');
+    activeWaitlistCourtMenu = null;
+  };
+
+  const ensureWaitlistCourtMenu = (row) => {
+    let menu = row.querySelector('.waitlist-row-court-menu');
+    if (menu) return menu;
+    menu = document.createElement('div');
+    menu.className = 'waitlist-row-court-menu';
+    menu.setAttribute('aria-hidden', 'true');
+
+    const label = document.createElement('p');
+    label.className = 'waitlist-row-court-menu-label';
+    label.textContent = '코트로 이동';
+
+    const hint = document.createElement('p');
+    hint.className = 'waitlist-row-court-menu-hint';
+
+    const list = document.createElement('div');
+    list.className = 'waitlist-row-court-menu-list';
+
+    const empty = document.createElement('p');
+    empty.className = 'waitlist-row-court-menu-empty';
+    empty.textContent = '등록된 코트가 없습니다.';
+
+    menu.appendChild(label);
+    menu.appendChild(hint);
+    menu.appendChild(list);
+    menu.appendChild(empty);
+
+    const slotRow = row.querySelector('.waitlist-slot-row');
+    if (slotRow) {
+      row.insertBefore(menu, slotRow);
+    } else {
+      row.appendChild(menu);
+    }
+    return menu;
+  };
+
+  const renderWaitlistCourtMenu = (row, menu) => {
+    if (!row || !menu) return;
+    const list = menu.querySelector('.waitlist-row-court-menu-list');
+    const hint = menu.querySelector('.waitlist-row-court-menu-hint');
+    const empty = menu.querySelector('.waitlist-row-court-menu-empty');
+    if (!list || !hint || !empty) return;
+    list.innerHTML = '';
+
+    const participants = getWaitlistRowParticipants(row);
+    const hasParticipants = participants.length > 0;
+    const courts = boardEl
+      ? [...boardEl.querySelectorAll('.court')].sort(
+          (a, b) => Number(a.dataset.number || 0) - Number(b.dataset.number || 0),
+        )
+      : [];
+    const hasCourts = courts.length > 0;
+
+    hint.textContent = hasParticipants ? '이동할 코트를 선택하세요.' : '대기 인원을 먼저 추가하세요.';
+    hint.classList.toggle('is-disabled', !hasParticipants);
+
+    empty.classList.toggle('is-visible', !hasCourts);
+    if (!hasCourts) {
+      return;
+    }
+
+    courts.forEach((court) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'waitlist-row-court-option';
+      const number = court.dataset.number;
+      button.textContent = number ? `코트 ${number}` : '코트';
+      button.disabled = !hasParticipants;
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        handleWaitlistCourtMenuSelection(row, court);
+      });
+      list.appendChild(button);
+    });
+  };
+
+  const handleWaitlistCourtMenuSelection = (row, court) => {
+    if (!row || !court) return;
+    const participants = getWaitlistRowParticipants(row);
+    if (!participants.length) return;
+    const payload = {
+      source: 'waitlistRow',
+      rowId: row.dataset.rowId,
+      participants,
+    };
+    handleWaitlistRowDropOnCourt(payload, court);
+    closeWaitlistCourtMenu();
+  };
+
+  const handleWaitlistCourtMenuDocumentClick = (event) => {
+    if (!activeWaitlistCourtMenu) return;
+    const { menu, trigger } = activeWaitlistCourtMenu;
+    if (menu?.contains(event.target) || trigger?.contains(event.target)) {
+      return;
+    }
+    closeWaitlistCourtMenu();
+  };
+
+  const handleWaitlistCourtMenuKeydown = (event) => {
+    if (event.key === 'Escape' && activeWaitlistCourtMenu) {
+      closeWaitlistCourtMenu();
     }
   };
 
@@ -913,9 +1067,14 @@ const badmintonBoard = (() => {
     title.textContent = `대기 라인 ${waitlistRowsEl.childElementCount + 1}`;
     title.classList.add('waitlist-row-title');
     title.draggable = true;
+    title.setAttribute('role', 'button');
+    title.setAttribute('tabindex', '0');
+    title.setAttribute('aria-expanded', 'false');
     title.addEventListener('dragstart', (event) => handleWaitlistRowDragStart(event, row));
     title.addEventListener('dragend', () => handleWaitlistRowDragEnd(row));
     title.addEventListener('dragenter', (event) => event.preventDefault());
+    title.addEventListener('click', (event) => handleWaitlistRowTitleClick(event, row, title));
+    title.addEventListener('keydown', (event) => handleWaitlistRowTitleKeydown(event, row, title));
 
     const actions = document.createElement('div');
     actions.className = 'waitlist-row-header-actions';
@@ -969,6 +1128,7 @@ const badmintonBoard = (() => {
   const removeWaitlistRow = (row) => {
     const cards = row.querySelectorAll('.wait-card');
     cards.forEach((card) => removeWaitlistCard(card));
+    closeWaitlistCourtMenu(row);
     if (slotPickerActiveSlot && row.contains(slotPickerActiveSlot)) {
       closeSlotParticipantPicker();
     }
@@ -1143,6 +1303,7 @@ const badmintonBoard = (() => {
 
   const handleWaitlistRowDragStart = (event, row) => {
     if (!row) return;
+    closeWaitlistCourtMenu(row);
     const participants = getWaitlistRowParticipants(row);
     row.classList.add('waitlist-row-dragging');
     setDragPayload(event, {
@@ -1226,6 +1387,7 @@ const badmintonBoard = (() => {
       }
     }
     handleWaitlistRowDragEnd(row);
+    closeWaitlistCourtMenu(row);
     schedulePersist();
   };
 
