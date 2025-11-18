@@ -6,7 +6,7 @@ const cors = require('cors');
 const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 
-const EDITOR_PORT = Number(process.env.EDITOR_PORT || 702);
+const EDITOR_PORT = Number(process.env.EDITOR_PORT || 2580);
 const VIEWER_PORT = Number(process.env.VIEWER_PORT || 9999);
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data', 'app-state.db');
 const STATIC_DIR = process.env.STATIC_DIR || path.join(__dirname, '..');

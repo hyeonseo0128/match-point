@@ -19,7 +19,7 @@
    npm start
    ```
 3. 브라우저에서 접속  
-   - 편집 권한: `http://localhost:702`  
+   - 편집 권한: `http://localhost:2580`  
    - 보기 전용: `http://localhost:9999`  
    - 두 포트 모두 같은 SQLite 상태를 공유하며, 서버에서 SSE를 사용해 실시간으로 변경 사항을 푸시하므로 새로고침 없이도 반영됩니다.
    - 필요 시 `EDITOR_PORT`, `VIEWER_PORT` 환경 변수를 설정해 포트를 변경할 수 있습니다.
