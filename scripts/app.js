@@ -71,6 +71,7 @@ const badmintonBoard = (() => {
   const NAME_RESET_HOLD_DURATION = 2000;
   const SHUTTLE_IMAGE = './assets/image/shuttlecock.png';
   const STATE_API_ENDPOINT = '/api/state';
+  const STATE_STREAM_ENDPOINT = '/api/stream';
   const CAPABILITIES_ENDPOINT = '/api/capabilities';
   const history = {};
   let isReadOnlyMode = false;
@@ -114,6 +115,8 @@ const badmintonBoard = (() => {
   let slotPickerActiveSlot = null;
   let activeWaitlistCourtMenu = null;
   let participantSortSelect;
+  let stateEventSource = null;
+  let stateReloadTimer = null;
 
   const disableElement = (element) => {
     if (!element) return;
@@ -198,6 +201,106 @@ const badmintonBoard = (() => {
     disableCardInteractions();
   };
 
+  const clearHistorySnapshot = () => {
+    Object.keys(history).forEach((key) => {
+      delete history[key];
+    });
+  };
+
+  const resetToDefaultState = ({ shouldPersist = true } = {}) => {
+    participants.length = 0;
+    normalizeParticipants();
+    clearHistorySnapshot();
+    renderParticipants();
+    clearWaitlistUI();
+    clearBoardUI();
+    ensureWaitlistRow();
+    createCourt(3);
+    createCourt(4);
+    if (isReadOnlyMode) {
+      disableCardInteractions();
+    }
+    if (shouldPersist) {
+      schedulePersist();
+    }
+  };
+
+  const applyStateSnapshot = (state, { shouldPersist = true } = {}) => {
+    if (!state) {
+      resetToDefaultState({ shouldPersist });
+      return;
+    }
+    participants.length = 0;
+    if (Array.isArray(state.participants)) {
+      state.participants.forEach((member) => {
+        participants.push({ ...member });
+      });
+    }
+    normalizeParticipants();
+    participantSortMode = state.participantSortMode || DEFAULT_PARTICIPANT_SORT_MODE;
+    clearHistorySnapshot();
+    if (state.history) {
+      Object.entries(state.history).forEach(([key, value]) => {
+        history[key] = value;
+      });
+    }
+    renderParticipants();
+    applySavedState(state, { shouldPersist });
+  };
+
+  const refreshStateFromServer = async (nextState = null) => {
+    if (typeof window === 'undefined') return;
+    let latest = nextState;
+    if (!latest) {
+      latest = await loadState();
+    }
+    if (latest) {
+      applyStateSnapshot(latest, { shouldPersist: false });
+    } else {
+      resetToDefaultState({ shouldPersist: false });
+    }
+  };
+
+  const handleStateStreamUpdate = (event) => {
+    if (isRestoringState) return;
+    let payload = null;
+    try {
+      payload = event?.data ? JSON.parse(event.data) : null;
+    } catch (error) {
+      console.error('잘못된 SSE 데이터입니다.', error);
+    }
+    window.clearTimeout(stateReloadTimer);
+    stateReloadTimer = window.setTimeout(() => {
+      refreshStateFromServer(payload?.state || null);
+    }, 60);
+  };
+
+  const disposeStateStream = () => {
+    if (stateEventSource) {
+      stateEventSource.close();
+      stateEventSource = null;
+    }
+  };
+
+  const handleStateStreamError = () => {
+    disposeStateStream();
+    window.setTimeout(() => {
+      initStateStream();
+    }, 1000);
+  };
+
+  const initStateStream = () => {
+    if (typeof window === 'undefined') return;
+    if (stateEventSource || !window.EventSource) return;
+    try {
+      stateEventSource = new EventSource(STATE_STREAM_ENDPOINT);
+      stateEventSource.addEventListener('stateUpdate', handleStateStreamUpdate);
+      stateEventSource.addEventListener('error', handleStateStreamError);
+    } catch (error) {
+      console.error('상태 스트림을 구독하지 못했습니다.', error);
+    }
+  };
+
   const getParticipantById = (id) => participants.find((member) => member.id === id);
 
   const init = async () => {
@@ -237,33 +340,9 @@ const badmintonBoard = (() => {
     }
 
     const savedState = await loadState();
-    if (savedState?.participants?.length) {
-      participants.length = 0;
-      savedState.participants.forEach((member) => {
-        participants.push({ ...member });
-      });
-    }
-    normalizeParticipants();
-    participantSortMode = savedState?.participantSortMode || DEFAULT_PARTICIPANT_SORT_MODE;
-    if (savedState?.history) {
-      Object.keys(history).forEach((key) => {
-        delete history[key];
-      });
-      Object.entries(savedState.history).forEach(([key, value]) => {
-        history[key] = value;
-      });
-    }
-    renderParticipants();
+    applyStateSnapshot(savedState);
     if (!isReadOnlyMode) {
       enableListDrop();
-    }
-    if (savedState) {
-      applySavedState(savedState);
-    } else {
-      ensureWaitlistRow();
-      createCourt(3);
-      createCourt(4);
-      schedulePersist();
     }
     bindParticipantDetailModal();
 
@@ -289,6 +368,7 @@ const badmintonBoard = (() => {
       applyReadOnlyUiState();
     }
     downloadHistoryBtn?.addEventListener('click', handleDownloadHistory);
+    initStateStream();
   };
 
   const bindWaitlistReorderEvents = () => {
@@ -1301,7 +1381,7 @@ const badmintonBoard = (() => {
     }
   };
 
-  const applySavedState = (state) => {
+  const applySavedState = (state, { shouldPersist = true } = {}) => {
     if (!state) return;
     isRestoringState = true;
     try {
@@ -1353,7 +1433,9 @@ const badmintonBoard = (() => {
       if (isReadOnlyMode) {
         disableCardInteractions();
       }
-      schedulePersist();
+      if (shouldPersist) {
+        schedulePersist();
+      }
     }
   };
 

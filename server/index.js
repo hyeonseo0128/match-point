@@ -31,6 +31,28 @@ async function ensureDatabase() {
 
 async function createServer() {
   const db = await ensureDatabase();
+  const sseClients = new Set();
+
+  const broadcastStateUpdate = async () => {
+    if (!sseClients.size) return;
+    let statePayload = null;
+    try {
+      const state = await loadState();
+      statePayload = JSON.stringify({ timestamp: Date.now(), state });
+    } catch (error) {
+      console.error('Failed to read state for SSE broadcast', error);
+      statePayload = JSON.stringify({ timestamp: Date.now(), state: null });
+    }
+    const payload = `event: stateUpdate\ndata: ${statePayload}\n\n`;
+    sseClients.forEach((client) => {
+      try {
+        client.write(payload);
+      } catch (error) {
+        console.error('Failed to push SSE update', error);
+        sseClients.delete(client);
+      }
+    });
+  };
 
   const loadState = async () => {
     const row = await db.get('SELECT data FROM app_state WHERE id = 1');
@@ -82,6 +104,19 @@ async function createServer() {
       }
     });
 
+    app.get('/api/stream', (req, res) => {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.flushHeaders?.();
+      res.write(`event: connected\ndata: {"readOnly":${readOnly}}\n\n`);
+
+      sseClients.add(res);
+      req.on('close', () => {
+        sseClients.delete(res);
+      });
+    });
+
     if (readOnly) {
       app.put('/api/state', (req, res) => {
         res.status(403).json({ message: 'Viewer mode is read-only.' });
@@ -97,6 +132,7 @@ async function createServer() {
             return res.status(400).json({ message: 'state payload is required' });
           }
           await saveState(state);
+          await broadcastStateUpdate();
           res.status(204).end();
         } catch (error) {
           console.error('Failed to save state', error);
@@ -107,6 +143,7 @@ async function createServer() {
       app.delete('/api/state', async (req, res) => {
         try {
           await deleteState();
+          await broadcastStateUpdate();
           res.status(204).end();
         } catch (error) {
           console.error('Failed to delete state', error);
