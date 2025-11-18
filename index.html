@@ -45,12 +45,24 @@
 
       <section class="participants-section" aria-label="멤버 목록">
         <div class="participants-header">
-          <h2>회원 목록</h2>
+          <div class="participants-heading-group">
+            <h2>회원 목록</h2>
+            <div class="participant-sort-bar">
+              <label class="participant-sort-label" for="participantSortSelect">정렬 기준</label>
+              <select id="participantSortSelect" class="participant-sort-select">
+                <option value="gamesAsc">게임 적게 친 순</option>
+                <option value="arrival">도착 순</option>
+                <option value="name">이름 순</option>
+                <option value="created">추가 순</option>
+              </select>
+            </div>
+          </div>
           <div class="participants-actions">
             <button id="hardResetBtn" class="btn danger" type="button">전체 초기화</button>
           </div>
         </div>
-        <p class="section-description">필요한 위치에 끌어 놓고, 다시 목록으로 가져오고 싶다면 이 영역에 드롭하세요.</p>
+
+        <!-- <p class="section-description">필요한 위치에 끌어 놓고, 다시 목록으로 가져오고 싶다면 이 영역에 드롭하세요.</p> -->
 
         <div class="participant-controls">
           <div class="field-group">

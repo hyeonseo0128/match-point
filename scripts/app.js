@@ -18,6 +18,13 @@ const badmintonBoard = (() => {
     // { id: 'p16', name: '채종일', color: 'blue' },
   ];
   const PARTICIPANT_COLORS = ['blue', 'pink', 'orange'];
+  const PARTICIPANT_SORT_MODES = {
+    GAMES_ASC: 'gamesAsc',
+    ARRIVAL: 'arrival',
+    NAME: 'name',
+    CREATED: 'created',
+  };
+  const DEFAULT_PARTICIPANT_SORT_MODE = PARTICIPANT_SORT_MODES.GAMES_ASC;
   participants.forEach((member) => {
     member.status = member.status || 'pending';
     member.sessions = member.sessions || {};
@@ -58,6 +65,7 @@ const badmintonBoard = (() => {
   let participantDetailCountDecreaseBtn;
   let participantDetailColorInputs = [];
   let activeDetailParticipantId = null;
+  let participantSortMode = DEFAULT_PARTICIPANT_SORT_MODE;
   const usedCourtNumbers = new Set();
   let courtCount = 0;
   let boardCardSeq = 0;
@@ -72,12 +80,14 @@ const badmintonBoard = (() => {
   let slotPickerEmptyMessageEl;
   let slotPickerActiveSlot = null;
   let activeWaitlistCourtMenu = null;
+  let participantSortSelect;
 
   const getParticipantById = (id) => participants.find((member) => member.id === id);
 
   const init = () => {
     boardEl = document.getElementById('gameBoard');
     participantsListEl = document.getElementById('participantsList');
+    participantSortSelect = document.getElementById('participantSortSelect');
     addCourtBtn = document.getElementById('addCourtBtn');
     resetBtn = document.getElementById('resetBoardBtn');
     participantNameInput = document.getElementById('participantNameInput');
@@ -110,6 +120,7 @@ const badmintonBoard = (() => {
       });
     }
     normalizeParticipants();
+    participantSortMode = savedState?.participantSortMode || DEFAULT_PARTICIPANT_SORT_MODE;
     if (savedState?.history) {
       Object.keys(history).forEach((key) => {
         delete history[key];
@@ -141,6 +152,7 @@ const badmintonBoard = (() => {
         handleAddParticipant();
       }
     });
+    participantSortSelect?.addEventListener('change', handleParticipantSortChange);
     bindWaitlistReorderEvents();
     bindParticipantDetailModal();
     initSlotParticipantPicker();
@@ -257,10 +269,8 @@ const badmintonBoard = (() => {
     const count = getDetailCountInputValue();
     setParticipantTodayCount(activeDetailParticipantId, count);
     const selectedColor = getDetailColorValue();
-    const colorChanged = setParticipantColor(activeDetailParticipantId, selectedColor);
-    if (colorChanged) {
-      refreshSlotPickerOptions();
-    }
+    setParticipantColor(activeDetailParticipantId, selectedColor);
+    renderParticipants();
     schedulePersist();
     closeParticipantDetail();
   };
@@ -613,15 +623,91 @@ const badmintonBoard = (() => {
 
   const renderParticipants = () => {
     if (!participantsListEl) return;
+    if (participantSortSelect) {
+      participantSortSelect.value = participantSortMode;
+    }
     resetListCardActionObserver();
     participantsListEl.innerHTML = '';
-    participants.forEach((member) => {
+    const sortedMembers = getSortedParticipants();
+    sortedMembers.forEach((member) => {
       const card = createListCard(member);
       participantsListEl.appendChild(card);
       observeListCardActionLayout(card);
     });
     updateAllParticipantStats();
     refreshSlotPickerOptions();
+  };
+
+  const getSortedParticipants = () => {
+    if (participantSortMode === PARTICIPANT_SORT_MODES.CREATED) {
+      return [...participants];
+    }
+    const comparator = getParticipantComparator(participantSortMode);
+    if (!comparator) {
+      return [...participants];
+    }
+    const indexed = participants.map((member, index) => ({ member, index }));
+    indexed.sort((a, b) => {
+      const diff = comparator(a.member, b.member);
+      if (diff !== 0) return diff;
+      return compareNumbers(a.index, b.index);
+    });
+    return indexed.map((entry) => entry.member);
+  };
+
+  const getParticipantComparator = (mode) => {
+    switch (mode) {
+      case PARTICIPANT_SORT_MODES.GAMES_ASC:
+        return compareParticipantsByGameCount;
+      case PARTICIPANT_SORT_MODES.ARRIVAL:
+        return compareParticipantsByArrival;
+      case PARTICIPANT_SORT_MODES.NAME:
+        return compareParticipantsByName;
+      default:
+        return null;
+    }
+  };
+
+  const compareNumbers = (a, b) => {
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+  };
+
+  const compareParticipantsByName = (a, b) => {
+    const nameA = a.name || '';
+    const nameB = b.name || '';
+    return nameA.localeCompare(nameB, 'ko-KR');
+  };
+
+  const getParticipantJoinedTimestamp = (participantId) => {
+    const joinedAt = getParticipantJoinedAt(participantId);
+    if (!joinedAt) return Number.POSITIVE_INFINITY;
+    const timestamp = Date.parse(joinedAt);
+    if (Number.isNaN(timestamp)) {
+      return Number.POSITIVE_INFINITY;
+    }
+    return timestamp;
+  };
+
+  const compareParticipantsByArrival = (a, b) => {
+    const diff = compareNumbers(getParticipantJoinedTimestamp(a.id), getParticipantJoinedTimestamp(b.id));
+    if (diff !== 0) return diff;
+    return compareParticipantsByName(a, b);
+  };
+
+  const compareParticipantsByGameCount = (a, b) => {
+    const diff = compareNumbers(getParticipantTodayCount(a.id), getParticipantTodayCount(b.id));
+    if (diff !== 0) return diff;
+    return compareParticipantsByArrival(a, b);
+  };
+
+  const handleParticipantSortChange = (event) => {
+    const nextMode = event.target?.value;
+    if (!nextMode || participantSortMode === nextMode) return;
+    participantSortMode = nextMode;
+    renderParticipants();
+    schedulePersist();
   };
 
   const getParticipantStatus = (participantId) => {
@@ -920,6 +1006,7 @@ const badmintonBoard = (() => {
       courts: [],
       waitlist: [],
       history: JSON.parse(JSON.stringify(history)),
+      participantSortMode,
     };
 
     if (boardEl) {
@@ -1344,6 +1431,7 @@ const badmintonBoard = (() => {
       incrementParticipantGameCount(participantId);
       removeBoardCard(card);
     });
+    renderParticipants();
     schedulePersist();
   };
 
@@ -1592,11 +1680,8 @@ const badmintonBoard = (() => {
       status: 'pending',
     };
     participants.push(newParticipant);
-    const card = createListCard(newParticipant);
-    participantsListEl.appendChild(card);
-    observeListCardActionLayout(card);
-    refreshSlotPickerOptions();
     setParticipantJoinedAt(newParticipant.id, new Date());
+    renderParticipants();
     participantNameInput.value = '';
     participantNameInput.focus();
     schedulePersist();
@@ -1619,7 +1704,7 @@ const badmintonBoard = (() => {
     }
     removeBoardCardsByParticipant(participantId);
     removeWaitlistEntries(participantId);
-    refreshSlotPickerOptions();
+    renderParticipants();
     schedulePersist();
   };
 

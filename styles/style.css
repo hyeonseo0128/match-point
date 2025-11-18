@@ -516,12 +516,44 @@ body{
   align-items:center;
   gap:12px;
   margin-bottom:8px;
+  flex-wrap:wrap;
+}
+.participants-heading-group{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
 }
 .participants-actions{
   display:flex;
   gap:8px;
   flex-wrap:wrap;
   justify-content:flex-end;
+}
+.participant-sort-bar{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  align-items:center;
+  margin:0;
+}
+.participant-sort-label{
+  font-size:0.85rem;
+  color:var(--muted);
+  font-weight:600;
+}
+.participant-sort-select{
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:8px 12px;
+  font-size:0.9rem;
+  min-width:180px;
+  background:#fff;
+}
+.participant-sort-select:focus{
+  outline:none;
+  border-color:rgba(59,130,246,0.9);
+  box-shadow:0 0 0 3px rgba(59,130,246,0.2);
 }
 
 .btn.danger{
