@@ -2030,13 +2030,19 @@ const badmintonBoard = (() => {
     removeBtn.setAttribute('aria-label', `코트 ${courtNumber} 삭제`);
     removeBtn.innerHTML = '&times;';
 
-    label.addEventListener('click', () => handleEditCourtNumber(court));
-    label.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        handleEditCourtNumber(court);
-      }
-    });
+    if (isReadOnlyMode) {
+      label.setAttribute('aria-disabled', 'true');
+      label.setAttribute('tabindex', '-1');
+      label.classList.add('is-disabled');
+    } else {
+      label.addEventListener('click', () => handleEditCourtNumber(court));
+      label.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          handleEditCourtNumber(court);
+        }
+      });
+    }
 
     const completeBtn = document.createElement('button');
     completeBtn.type = 'button';
@@ -2097,6 +2103,7 @@ const badmintonBoard = (() => {
   };
 
   const handleEditCourtNumber = (court) => {
+    if (isReadOnlyMode) return;
     const current = Number(court.dataset.number);
     if (!Number.isInteger(current)) return;
 
