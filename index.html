@@ -124,6 +124,21 @@
     </div>
   </div>
 
+  <div id="slotParticipantPicker" class="slot-picker" aria-hidden="true">
+    <div class="slot-picker-backdrop" data-slot-picker-action="close"></div>
+    <div class="slot-picker-panel" role="dialog" aria-modal="true" aria-labelledby="slotPickerTitle">
+      <header class="slot-picker-header">
+        <h3 id="slotPickerTitle">코트에 배치할 회원 선택</h3>
+        <button type="button" class="slot-picker-close" data-slot-picker-action="close" aria-label="닫기">&times;</button>
+      </header>
+      <div class="slot-picker-search">
+        <input type="text" id="slotPickerSearchInput" placeholder="회원 이름 검색" autocomplete="off" />
+      </div>
+      <div class="slot-picker-list" id="slotPickerList" role="listbox"></div>
+      <p class="slot-picker-empty" id="slotPickerEmptyMessage">검색 결과가 없습니다.</p>
+    </div>
+  </div>
+
   <script src="./scripts/app.js" defer></script>
 </body>
 </html>

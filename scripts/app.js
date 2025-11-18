@@ -61,6 +61,11 @@ const badmintonBoard = (() => {
   let currentWaitlistDropTarget = null;
   const LIST_CARD_ACTION_STACK_WIDTH = 320;
   let listCardResizeObserver = null;
+  let slotParticipantPickerEl;
+  let slotPickerSearchInput;
+  let slotPickerListEl;
+  let slotPickerEmptyMessageEl;
+  let slotPickerActiveSlot = null;
 
   const getParticipantById = (id) => participants.find((member) => member.id === id);
 
@@ -83,6 +88,10 @@ const badmintonBoard = (() => {
     participantDetailCloseBtn = document.getElementById('participantDetailCloseBtn');
     participantDetailCountIncreaseBtn = document.getElementById('participantDetailCountIncrease');
     participantDetailCountDecreaseBtn = document.getElementById('participantDetailCountDecrease');
+    slotParticipantPickerEl = document.getElementById('slotParticipantPicker');
+    slotPickerSearchInput = document.getElementById('slotPickerSearchInput');
+    slotPickerListEl = document.getElementById('slotPickerList');
+    slotPickerEmptyMessageEl = document.getElementById('slotPickerEmptyMessage');
 
     if (!boardEl || !participantsListEl) return;
 
@@ -127,6 +136,7 @@ const badmintonBoard = (() => {
     });
     bindWaitlistReorderEvents();
     bindParticipantDetailModal();
+    initSlotParticipantPicker();
   };
 
   const bindWaitlistReorderEvents = () => {
@@ -304,6 +314,109 @@ const badmintonBoard = (() => {
     listCardResizeObserver?.disconnect();
   };
 
+  const initSlotParticipantPicker = () => {
+    if (!slotParticipantPickerEl) return;
+    slotParticipantPickerEl.addEventListener('click', (event) => {
+      const action = event.target?.dataset?.slotPickerAction;
+      if (action === 'close') {
+        closeSlotParticipantPicker();
+      }
+    });
+    slotPickerListEl?.addEventListener('click', handleSlotPickerListClick);
+    slotPickerSearchInput?.addEventListener('input', handleSlotPickerSearchInput);
+    document.addEventListener('keydown', handleSlotPickerKeydown);
+  };
+
+  const openSlotParticipantPicker = (slot) => {
+    if (!slotParticipantPickerEl || !slot) return;
+    if (slotPickerActiveSlot) {
+      slotPickerActiveSlot.classList.remove('slot-picker-target');
+    }
+    slotPickerActiveSlot = slot;
+    slotPickerActiveSlot.classList.add('slot-picker-target');
+    slotParticipantPickerEl.classList.add('is-open');
+    slotParticipantPickerEl.setAttribute('aria-hidden', 'false');
+    if (slotPickerSearchInput) {
+      slotPickerSearchInput.value = '';
+    }
+    renderSlotParticipantOptions();
+    requestAnimationFrame(() => {
+      slotPickerSearchInput?.focus();
+    });
+  };
+
+  const closeSlotParticipantPicker = () => {
+    if (!slotParticipantPickerEl) return;
+    slotParticipantPickerEl.classList.remove('is-open');
+    slotParticipantPickerEl.setAttribute('aria-hidden', 'true');
+    if (slotPickerActiveSlot) {
+      slotPickerActiveSlot.classList.remove('slot-picker-target');
+      slotPickerActiveSlot = null;
+    }
+  };
+
+  const renderSlotParticipantOptions = (query = '') => {
+    if (!slotPickerListEl) return;
+    const normalized = query.trim().toLowerCase();
+    slotPickerListEl.innerHTML = '';
+    const matches = participants
+      .filter((member) => (member.name || '').toLowerCase().includes(normalized))
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    matches.forEach((member) => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'slot-picker-item';
+      item.dataset.participantId = member.id;
+      item.setAttribute('role', 'option');
+      const name = document.createElement('span');
+      name.className = 'slot-picker-item-name';
+      name.textContent = member.name;
+      const meta = document.createElement('span');
+      meta.className = 'slot-picker-item-meta';
+      meta.textContent = formatTodayCount(getParticipantTodayCount(member.id));
+      item.appendChild(name);
+      item.appendChild(meta);
+      slotPickerListEl.appendChild(item);
+    });
+    slotPickerEmptyMessageEl?.classList.toggle('is-visible', matches.length === 0);
+  };
+
+  const handleSlotPickerSearchInput = (event) => {
+    renderSlotParticipantOptions(event.target.value || '');
+  };
+
+  const handleSlotPickerListClick = (event) => {
+    const target = event.target?.closest('.slot-picker-item');
+    if (!target || !slotPickerListEl?.contains(target)) return;
+    const participantId = target.dataset.participantId;
+    handleSlotPickerSelection(participantId);
+  };
+
+  const handleSlotPickerSelection = (participantId) => {
+    if (!participantId || !slotPickerActiveSlot) return;
+    const participant = getParticipantById(participantId);
+    if (!participant) return;
+    const existing = boardEl.querySelector(`.slot .card[data-participant-id="${participant.id}"]`);
+    if (existing) {
+      removeBoardCard(existing);
+    }
+    const card = createBoardCard(participant);
+    placeCardInSlot(card, slotPickerActiveSlot);
+    closeSlotParticipantPicker();
+  };
+
+  const handleSlotPickerKeydown = (event) => {
+    if (event.key === 'Escape' && slotParticipantPickerEl?.classList.contains('is-open')) {
+      closeSlotParticipantPicker();
+    }
+  };
+
+  const refreshSlotPickerOptions = () => {
+    if (!slotParticipantPickerEl?.classList.contains('is-open')) return;
+    const query = slotPickerSearchInput?.value || '';
+    renderSlotParticipantOptions(query);
+  };
+
   const renderParticipants = () => {
     if (!participantsListEl) return;
     resetListCardActionObserver();
@@ -314,6 +427,7 @@ const badmintonBoard = (() => {
       observeListCardActionLayout(card);
     });
     updateAllParticipantStats();
+    refreshSlotPickerOptions();
   };
 
   const getParticipantStatus = (participantId) => {
@@ -1253,6 +1367,7 @@ const badmintonBoard = (() => {
     const card = createListCard(newParticipant);
     participantsListEl.appendChild(card);
     observeListCardActionLayout(card);
+    refreshSlotPickerOptions();
     setParticipantJoinedAt(newParticipant.id, new Date());
     participantNameInput.value = '';
     participantNameInput.focus();
@@ -1276,6 +1391,7 @@ const badmintonBoard = (() => {
     }
     removeBoardCardsByParticipant(participantId);
     removeWaitlistEntries(participantId);
+    refreshSlotPickerOptions();
     schedulePersist();
   };
 
@@ -1478,6 +1594,14 @@ const badmintonBoard = (() => {
         placeCardInSlot(boardCard, slot);
       }
     });
+
+    slot.addEventListener('click', (event) => handleSlotClick(event, slot));
+  };
+
+  const handleSlotClick = (event, slot) => {
+    if (!slot || slot.dataset.occupantId) return;
+    if (event.defaultPrevented) return;
+    openSlotParticipantPicker(slot);
   };
 
   const placeCardInSlot = (card, slot) => {
@@ -1496,6 +1620,9 @@ const badmintonBoard = (() => {
     card.style.top = '';
     card.dataset.previousSlotId = slot.dataset.slotId || '';
     slot.appendChild(card);
+    if (slotPickerActiveSlot === slot) {
+      closeSlotParticipantPicker();
+    }
     schedulePersist();
   };
 
@@ -1530,6 +1657,9 @@ const badmintonBoard = (() => {
     const number = Number(court.dataset.number);
     if (number) {
       usedCourtNumbers.delete(number);
+    }
+    if (slotPickerActiveSlot && court.contains(slotPickerActiveSlot)) {
+      closeSlotParticipantPicker();
     }
     const cards = court.querySelectorAll('.card.on-board');
     cards.forEach((card) => removeBoardCard(card));

@@ -362,7 +362,7 @@ body{
   align-items:center;
   justify-content:center;
   padding:6px;
-  transition:border-color .15s ease, background .15s ease;
+  transition:border-color .15s ease, background .15s ease, min-height .2s ease;
   position:relative;
 }
 .slot::after{
@@ -376,6 +376,15 @@ body{
 .slot.filled{
   border-color:rgba(34,197,94,0.8);
   background:rgba(15,23,42,0.4);
+  min-height:150px;
+  align-items:stretch;
+  padding:10px;
+}
+.slot.slot-picker-target{
+  box-shadow:0 0 0 2px rgba(59,130,246,0.7) inset;
+}
+.slot.filled .card.on-board{
+  height:100%;
 }
 .slot-active{
   border-color:rgba(59,130,246,0.85);
@@ -395,6 +404,9 @@ body{
   }
   .slot{
     min-height:72px;
+  }
+  .slot.filled{
+    min-height:120px;
   }
 }
 
@@ -914,4 +926,113 @@ body{
 .participant-modal-footer{
   display:flex;
   justify-content:flex-end;
+}
+
+.slot-picker{
+  position:fixed;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  z-index:2100;
+}
+.slot-picker.is-open{
+  display:flex;
+}
+.slot-picker-backdrop{
+  position:absolute;
+  inset:0;
+  background:rgba(15,23,42,0.55);
+}
+.slot-picker-panel{
+  position:relative;
+  width:min(420px,90vw);
+  max-height:90vh;
+  background:#fff;
+  border-radius:24px;
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  box-shadow:0 25px 50px rgba(15,23,42,0.25);
+  z-index:1;
+}
+.slot-picker-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.slot-picker-header h3{
+  margin:0;
+  font-size:1.2rem;
+}
+.slot-picker-close{
+  border:none;
+  background:rgba(15,23,42,0.08);
+  border-radius:50%;
+  width:34px;
+  height:34px;
+  font-size:1.1rem;
+  cursor:pointer;
+  line-height:1;
+  color:var(--headline);
+}
+.slot-picker-search input{
+  width:100%;
+  padding:10px 14px;
+  border-radius:16px;
+  border:1px solid var(--border);
+  font-size:1rem;
+}
+.slot-picker-list{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  overflow-y:auto;
+  max-height:50vh;
+}
+.slot-picker-item{
+  border:1px solid rgba(15,23,42,0.12);
+  border-radius:16px;
+  padding:10px 14px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  cursor:pointer;
+  background:#fff;
+  transition:border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+.slot-picker-item:focus{
+  outline:none;
+  border-color:rgba(37,99,235,0.8);
+  box-shadow:0 0 0 3px rgba(37,99,235,0.25);
+}
+.slot-picker-item:hover{
+  border-color:rgba(37,99,235,0.6);
+  box-shadow:0 8px 18px rgba(15,23,42,0.1);
+  transform:translateY(-1px);
+}
+.slot-picker-item[data-disabled="true"]{
+  opacity:0.5;
+  pointer-events:none;
+}
+.slot-picker-item-name{
+  font-weight:600;
+  font-size:1rem;
+}
+.slot-picker-item-meta{
+  font-size:0.85rem;
+  color:var(--muted);
+}
+.slot-picker-empty{
+  margin:0;
+  font-size:0.95rem;
+  color:var(--muted);
+  text-align:center;
+  display:none;
+}
+.slot-picker-empty.is-visible{
+  display:block;
 }
