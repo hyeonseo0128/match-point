@@ -337,6 +337,17 @@ body{
   opacity:.6;
   box-shadow:none;
 }
+.wait-card-identity{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+}
+.wait-card .grade-badge{
+  width:24px;
+  height:24px;
+  border-width:1px;
+}
 .wait-card .name{
   font-weight:600;
   color:var(--headline);
@@ -621,6 +632,18 @@ body{
   font-size:0.95rem;
   background:#fff;
 }
+.field-group select,
+.participant-modal-field select{
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:10px 12px;
+  font-size:0.95rem;
+  background:#fff;
+  appearance:none;
+}
+.participant-grade-select{
+  min-width:140px;
+}
 .color-options{
   display:flex;
   gap:10px;
@@ -785,6 +808,30 @@ body{
 }
 .card .card-info .name{
   flex:1;
+}
+.card .name-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+}
+.grade-badge{
+  width:28px;
+  height:28px;
+  border-radius:99px;
+  object-fit:cover;
+  border:2px solid rgba(255,255,255,0.75);
+  box-shadow:0 6px 12px rgba(15,23,42,0.18);
+  flex-shrink:0;
+}
+.card:not(.on-board) .grade-badge{
+  border-color:rgba(15,23,42,0.08);
+  background:#fff;
+}
+.card.on-board .grade-badge{
+  width:36px;
+  height:36px;
+  border-color:rgba(255,255,255,0.55);
 }
 .card .today-count{
   font-size:0.75rem;

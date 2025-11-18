@@ -53,7 +53,7 @@
                 <option value="gamesAsc">게임 적게 친 순</option>
                 <option value="arrival">도착 순</option>
                 <option value="name">이름 순</option>
-                <option value="created">추가 순</option>
+                <!-- <option value="created">추가 순</option> -->
               </select>
             </div>
           </div>
@@ -83,6 +83,18 @@
                 <span class="chip-visual">게스트</span>
               </label>
             </div>
+          </div>
+
+          <div class="field-group">
+            <label for="participantGradeSelect">급수</label>
+            <select id="participantGradeSelect" class="participant-grade-select">
+              <option value="F" selected>F조</option>
+              <option value="E">E조</option>
+              <option value="D">D조</option>
+              <option value="C">C조</option>
+              <option value="B">B조</option>
+              <option value="A">A조</option>
+            </select>
           </div>
         </div>
 
@@ -146,6 +158,18 @@
               <span class="chip-visual">오렌지</span>
             </label>
           </div>
+        </div>
+
+        <div class="participant-modal-field">
+          <label class="field-label" for="participantDetailGradeSelect">급수</label>
+          <select id="participantDetailGradeSelect" class="participant-grade-select">
+            <option value="F">F조</option>
+            <option value="E">E조</option>
+            <option value="D">D조</option>
+            <option value="C">C조</option>
+            <option value="B">B조</option>
+            <option value="A">A조</option>
+          </select>
         </div>
       </div>
       <footer class="participant-modal-footer">

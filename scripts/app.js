@@ -18,6 +18,16 @@ const badmintonBoard = (() => {
     // { id: 'p16', name: '채종일', color: 'blue' },
   ];
   const PARTICIPANT_COLORS = ['blue', 'pink', 'orange'];
+  const PARTICIPANT_GRADES = ['F', 'E', 'D', 'C', 'B', 'A'];
+  const DEFAULT_PARTICIPANT_GRADE = 'F';
+  const PARTICIPANT_GRADE_IMAGES = {
+    A: './assets/image/a_grade.jpg',
+    B: './assets/image/b_grade.jpg',
+    C: './assets/image/c_grade.jpg',
+    D: './assets/image/d_grade.jpg',
+    E: './assets/image/e_grade.jpg',
+    F: './assets/image/f_grade.jpg',
+  };
   const PARTICIPANT_SORT_MODES = {
     GAMES_ASC: 'gamesAsc',
     ARRIVAL: 'arrival',
@@ -31,14 +41,33 @@ const badmintonBoard = (() => {
     member.color = normalizeParticipantColor(member.color);
   });
   const normalizeParticipantColor = (color) => (PARTICIPANT_COLORS.includes(color) ? color : 'blue');
+  const normalizeParticipantGrade = (grade) => (PARTICIPANT_GRADES.includes(grade) ? grade : DEFAULT_PARTICIPANT_GRADE);
   const normalizeParticipants = () => {
     participants.forEach((member) => {
       member.status = member.status || 'pending';
       member.sessions = member.sessions || {};
       member.color = normalizeParticipantColor(member.color);
+      member.grade = normalizeParticipantGrade(member.grade);
     });
   };
   normalizeParticipants();
+  const getGradeBadgeImage = (grade) => {
+    const normalized = normalizeParticipantGrade(grade);
+    return PARTICIPANT_GRADE_IMAGES[normalized] || PARTICIPANT_GRADE_IMAGES[DEFAULT_PARTICIPANT_GRADE];
+  };
+  const updateGradeBadgeElement = (badge, grade) => {
+    if (!badge) return;
+    const normalized = normalizeParticipantGrade(grade);
+    badge.src = getGradeBadgeImage(normalized);
+    badge.alt = `${normalized}조 급수 배지`;
+    badge.dataset.grade = normalized;
+  };
+  const createGradeBadgeElement = (grade) => {
+    const badge = document.createElement('img');
+    badge.className = 'grade-badge';
+    updateGradeBadgeElement(badge, grade);
+    return badge;
+  };
   const NAME_RESET_HOLD_DURATION = 2000;
   const SHUTTLE_IMAGE = './assets/image/shuttlecock.png';
   const STORAGE_KEY = 'badmintonBoardState';
@@ -50,6 +79,7 @@ const badmintonBoard = (() => {
   let addCourtBtn;
   let resetBtn;
   let participantNameInput;
+  let participantGradeSelect;
   let addParticipantBtn;
   let hardResetBtn;
   let downloadHistoryBtn;
@@ -64,6 +94,7 @@ const badmintonBoard = (() => {
   let participantDetailCountIncreaseBtn;
   let participantDetailCountDecreaseBtn;
   let participantDetailColorInputs = [];
+  let participantDetailGradeSelect;
   let activeDetailParticipantId = null;
   let participantSortMode = DEFAULT_PARTICIPANT_SORT_MODE;
   const usedCourtNumbers = new Set();
@@ -91,6 +122,7 @@ const badmintonBoard = (() => {
     addCourtBtn = document.getElementById('addCourtBtn');
     resetBtn = document.getElementById('resetBoardBtn');
     participantNameInput = document.getElementById('participantNameInput');
+    participantGradeSelect = document.getElementById('participantGradeSelect');
     addParticipantBtn = document.getElementById('addParticipantBtn');
     waitlistRowsEl = document.getElementById('waitlistRows');
     addWaitlistRowBtn = document.getElementById('addWaitlistRowBtn');
@@ -105,6 +137,7 @@ const badmintonBoard = (() => {
     participantDetailCountIncreaseBtn = document.getElementById('participantDetailCountIncrease');
     participantDetailCountDecreaseBtn = document.getElementById('participantDetailCountDecrease');
     participantDetailColorInputs = [...document.querySelectorAll('input[name="participantDetailColor"]')];
+    participantDetailGradeSelect = document.getElementById('participantDetailGradeSelect');
     slotParticipantPickerEl = document.getElementById('slotParticipantPicker');
     slotPickerSearchInput = document.getElementById('slotPickerSearchInput');
     slotPickerListEl = document.getElementById('slotPickerList');
@@ -233,6 +266,17 @@ const badmintonBoard = (() => {
     return normalizeParticipantColor(selected?.value);
   };
 
+  const setDetailGradeValue = (grade) => {
+    if (!participantDetailGradeSelect) return;
+    const normalized = normalizeParticipantGrade(grade);
+    participantDetailGradeSelect.value = normalized;
+  };
+
+  const getDetailGradeValue = () => {
+    if (!participantDetailGradeSelect) return DEFAULT_PARTICIPANT_GRADE;
+    return normalizeParticipantGrade(participantDetailGradeSelect.value);
+  };
+
   const openParticipantDetail = (participantId) => {
     if (!participantDetailModal) return;
     const participant = getParticipantById(participantId);
@@ -246,6 +290,7 @@ const badmintonBoard = (() => {
     const session = getParticipantTodaySession(participantId);
     setDetailCountInputValue(session?.count || 0);
     setDetailColorValue(participant.color || 'blue');
+    setDetailGradeValue(participant.grade || DEFAULT_PARTICIPANT_GRADE);
     if (participantDetailArrivalEl) {
       const arrivalLabel = formatArrivalTime(session?.joinedAt || null);
       participantDetailArrivalEl.textContent = arrivalLabel;
@@ -270,6 +315,8 @@ const badmintonBoard = (() => {
     setParticipantTodayCount(activeDetailParticipantId, count);
     const selectedColor = getDetailColorValue();
     setParticipantColor(activeDetailParticipantId, selectedColor);
+    const selectedGrade = getDetailGradeValue();
+    setParticipantGrade(activeDetailParticipantId, selectedGrade);
     renderParticipants();
     schedulePersist();
     closeParticipantDetail();
@@ -559,7 +606,11 @@ const badmintonBoard = (() => {
     slotPickerListEl.innerHTML = '';
     const matches = participants
       .filter((member) => (member.name || '').toLowerCase().includes(normalized))
-      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      .sort((a, b) => {
+        const diff = compareParticipantsByGameCount(a, b);
+        if (diff !== 0) return diff;
+        return compareParticipantsByName(a, b);
+      });
     matches.forEach((member) => {
       const item = document.createElement('button');
       item.type = 'button';
@@ -812,6 +863,33 @@ const badmintonBoard = (() => {
     return true;
   };
 
+  const updateParticipantCardGrades = (participantId, grade) => {
+    const nodes = document.querySelectorAll(
+      `.card[data-participant-id="${participantId}"], .wait-card[data-participant-id="${participantId}"]`,
+    );
+    nodes.forEach((node) => applyGradeToNode(node, grade));
+  };
+
+  const applyGradeToNode = (node, grade) => {
+    if (!node) return;
+    const normalized = normalizeParticipantGrade(grade);
+    node.dataset.grade = normalized;
+    const badge = node.querySelector('.grade-badge');
+    if (badge) {
+      updateGradeBadgeElement(badge, normalized);
+    }
+  };
+
+  const setParticipantGrade = (participantId, requestedGrade) => {
+    const participant = getParticipantById(participantId);
+    if (!participant) return false;
+    const normalized = normalizeParticipantGrade(requestedGrade || participant.grade);
+    if (participant.grade === normalized) return false;
+    participant.grade = normalized;
+    updateParticipantCardGrades(participantId, normalized);
+    return true;
+  };
+
   const applySubmissionState = (card, status) => {
     card.dataset.submissionStatus = status;
     if (status === 'submitted') {
@@ -996,10 +1074,11 @@ const badmintonBoard = (() => {
 
   const buildState = () => {
     const state = {
-      participants: participants.map(({ id, name, color, status, sessions }) => ({
+      participants: participants.map(({ id, name, color, grade, status, sessions }) => ({
         id,
         name,
         color,
+        grade,
         status,
         sessions: sessions ? { ...sessions } : {},
       })),
@@ -1232,11 +1311,19 @@ const badmintonBoard = (() => {
     card.id = `wait-card-${waitlistCardSeq++}`;
     card.dataset.participantId = member.id;
     card.dataset.previousSlotId = '';
+    const grade = normalizeParticipantGrade(member.grade);
+    card.dataset.grade = grade;
     attachNameResetHold(card, member.id);
 
     const nameEl = document.createElement('div');
     nameEl.className = 'name';
     nameEl.textContent = member.name;
+
+    const identity = document.createElement('div');
+    identity.className = 'wait-card-identity';
+    const gradeBadge = createGradeBadgeElement(grade);
+    identity.appendChild(gradeBadge);
+    identity.appendChild(nameEl);
 
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
@@ -1248,7 +1335,7 @@ const badmintonBoard = (() => {
       removeWaitlistCard(card);
     });
 
-    card.appendChild(nameEl);
+    card.appendChild(identity);
     card.appendChild(removeBtn);
 
     card.addEventListener('dragstart', (event) => handleWaitlistDragStart(event, card));
@@ -1487,6 +1574,8 @@ const badmintonBoard = (() => {
     card.dataset.participantId = member.id;
     const color = member.color || 'blue';
     card.dataset.color = color;
+    const grade = normalizeParticipantGrade(member.grade);
+    card.dataset.grade = grade;
     attachNameResetHold(card, member.id);
 
     const meta = document.createElement('div');
@@ -1507,7 +1596,13 @@ const badmintonBoard = (() => {
     statsEl.dataset.participantStats = member.id;
     statsEl.textContent = formatTodayCount(getParticipantTodayCount(member.id));
 
-    nameBlock.appendChild(nameEl);
+    const nameRow = document.createElement('div');
+    nameRow.className = 'name-row';
+    const gradeBadge = createGradeBadgeElement(grade);
+    nameRow.appendChild(gradeBadge);
+    nameRow.appendChild(nameEl);
+
+    nameBlock.appendChild(nameRow);
     nameBlock.appendChild(statsEl);
 
     const actions = document.createElement('div');
@@ -1548,6 +1643,8 @@ const badmintonBoard = (() => {
     card.dataset.previousSlotId = '';
     const color = member.color || 'blue';
     card.dataset.color = color;
+    const grade = normalizeParticipantGrade(member.grade);
+    card.dataset.grade = grade;
     attachNameResetHold(card, member.id);
 
     const meta = document.createElement('div');
@@ -1572,7 +1669,13 @@ const badmintonBoard = (() => {
     actions.appendChild(shuttleBtn);
     actions.appendChild(deleteBtn);
 
-    infoRow.appendChild(nameEl);
+    const identityRow = document.createElement('div');
+    identityRow.className = 'name-row';
+    const gradeBadge = createGradeBadgeElement(grade);
+    identityRow.appendChild(gradeBadge);
+    identityRow.appendChild(nameEl);
+
+    infoRow.appendChild(identityRow);
     infoRow.appendChild(actions);
 
     meta.appendChild(infoRow);
@@ -1673,23 +1776,33 @@ const badmintonBoard = (() => {
       return;
     }
     const color = getSelectedColor();
+    const grade = getSelectedGrade();
     const newParticipant = {
       id: `p${Date.now()}`,
       name,
       color,
       status: 'pending',
+      grade,
     };
     participants.push(newParticipant);
     setParticipantJoinedAt(newParticipant.id, new Date());
     renderParticipants();
     participantNameInput.value = '';
     participantNameInput.focus();
+    if (participantGradeSelect) {
+      participantGradeSelect.value = DEFAULT_PARTICIPANT_GRADE;
+    }
     schedulePersist();
   };
 
   const getSelectedColor = () => {
     const selected = document.querySelector('input[name="participantColor"]:checked');
     return selected?.value || 'blue';
+  };
+
+  const getSelectedGrade = () => {
+    if (!participantGradeSelect) return DEFAULT_PARTICIPANT_GRADE;
+    return normalizeParticipantGrade(participantGradeSelect.value);
   };
 
   const removeParticipant = (participantId) => {
