@@ -923,6 +923,17 @@ body{
   display:flex;
   justify-content:flex-end;
 }
+.participant-modal-field{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.participant-detail-colors{
+  flex-wrap:wrap;
+}
+.participant-detail-colors .color-chip{
+  flex:1;
+}
 
 .slot-picker{
   position:fixed;

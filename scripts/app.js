@@ -17,14 +17,18 @@ const badmintonBoard = (() => {
     // { id: 'p15', name: '이광재', color: 'blue' },
     // { id: 'p16', name: '채종일', color: 'blue' },
   ];
+  const PARTICIPANT_COLORS = ['blue', 'pink', 'orange'];
   participants.forEach((member) => {
     member.status = member.status || 'pending';
     member.sessions = member.sessions || {};
+    member.color = normalizeParticipantColor(member.color);
   });
+  const normalizeParticipantColor = (color) => (PARTICIPANT_COLORS.includes(color) ? color : 'blue');
   const normalizeParticipants = () => {
     participants.forEach((member) => {
       member.status = member.status || 'pending';
       member.sessions = member.sessions || {};
+      member.color = normalizeParticipantColor(member.color);
     });
   };
   normalizeParticipants();
@@ -52,6 +56,7 @@ const badmintonBoard = (() => {
   let participantDetailCloseBtn;
   let participantDetailCountIncreaseBtn;
   let participantDetailCountDecreaseBtn;
+  let participantDetailColorInputs = [];
   let activeDetailParticipantId = null;
   const usedCourtNumbers = new Set();
   let courtCount = 0;
@@ -88,6 +93,7 @@ const badmintonBoard = (() => {
     participantDetailCloseBtn = document.getElementById('participantDetailCloseBtn');
     participantDetailCountIncreaseBtn = document.getElementById('participantDetailCountIncrease');
     participantDetailCountDecreaseBtn = document.getElementById('participantDetailCountDecrease');
+    participantDetailColorInputs = [...document.querySelectorAll('input[name="participantDetailColor"]')];
     slotParticipantPickerEl = document.getElementById('slotParticipantPicker');
     slotPickerSearchInput = document.getElementById('slotPickerSearchInput');
     slotPickerListEl = document.getElementById('slotPickerList');
@@ -190,6 +196,28 @@ const badmintonBoard = (() => {
     setDetailCountInputValue(nextValue);
   };
 
+  const setDetailColorValue = (color) => {
+    if (!participantDetailColorInputs?.length) return;
+    const normalized = normalizeParticipantColor(color);
+    let matched = false;
+    participantDetailColorInputs.forEach((input) => {
+      const isMatch = input.value === normalized;
+      input.checked = isMatch;
+      if (isMatch) {
+        matched = true;
+      }
+    });
+    if (!matched && participantDetailColorInputs[0]) {
+      participantDetailColorInputs[0].checked = true;
+    }
+  };
+
+  const getDetailColorValue = () => {
+    if (!participantDetailColorInputs?.length) return 'blue';
+    const selected = participantDetailColorInputs.find((input) => input.checked);
+    return normalizeParticipantColor(selected?.value);
+  };
+
   const openParticipantDetail = (participantId) => {
     if (!participantDetailModal) return;
     const participant = getParticipantById(participantId);
@@ -202,6 +230,7 @@ const badmintonBoard = (() => {
     }
     const session = getParticipantTodaySession(participantId);
     setDetailCountInputValue(session?.count || 0);
+    setDetailColorValue(participant.color || 'blue');
     if (participantDetailArrivalEl) {
       const arrivalLabel = formatArrivalTime(session?.joinedAt || null);
       participantDetailArrivalEl.textContent = arrivalLabel;
@@ -224,6 +253,11 @@ const badmintonBoard = (() => {
     }
     const count = getDetailCountInputValue();
     setParticipantTodayCount(activeDetailParticipantId, count);
+    const selectedColor = getDetailColorValue();
+    const colorChanged = setParticipantColor(activeDetailParticipantId, selectedColor);
+    if (colorChanged) {
+      refreshSlotPickerOptions();
+    }
     schedulePersist();
     closeParticipantDetail();
   };
@@ -519,6 +553,23 @@ const badmintonBoard = (() => {
     const status = getParticipantStatus(participantId);
     const cards = document.querySelectorAll(`.card[data-participant-id="${participantId}"]`);
     cards.forEach((card) => applySubmissionState(card, status));
+  };
+
+  const updateParticipantCardColors = (participantId, color) => {
+    const cards = document.querySelectorAll(`.card[data-participant-id="${participantId}"]`);
+    cards.forEach((card) => {
+      card.dataset.color = color;
+    });
+  };
+
+  const setParticipantColor = (participantId, requestedColor) => {
+    const participant = getParticipantById(participantId);
+    if (!participant) return false;
+    const normalized = normalizeParticipantColor(requestedColor || participant.color);
+    if (participant.color === normalized) return false;
+    participant.color = normalized;
+    updateParticipantCardColors(participantId, normalized);
+    return true;
   };
 
   const applySubmissionState = (card, status) => {
