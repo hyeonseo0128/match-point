@@ -70,7 +70,7 @@ const badmintonBoard = (() => {
   };
   const NAME_RESET_HOLD_DURATION = 2000;
   const SHUTTLE_IMAGE = './assets/image/shuttlecock.png';
-  const STORAGE_KEY = 'badmintonBoardState';
+  const STATE_API_ENDPOINT = '/api/state';
   const history = {};
   let isRestoringState = false;
   let saveTimer = null;
@@ -115,7 +115,7 @@ const badmintonBoard = (() => {
 
   const getParticipantById = (id) => participants.find((member) => member.id === id);
 
-  const init = () => {
+  const init = async () => {
     boardEl = document.getElementById('gameBoard');
     participantsListEl = document.getElementById('participantsList');
     participantSortSelect = document.getElementById('participantSortSelect');
@@ -145,7 +145,7 @@ const badmintonBoard = (() => {
 
     if (!boardEl || !participantsListEl) return;
 
-    const savedState = loadState();
+    const savedState = await loadState();
     if (savedState?.participants?.length) {
       participants.length = 0;
       savedState.participants.forEach((member) => {
@@ -977,12 +977,10 @@ const badmintonBoard = (() => {
     target.addEventListener('dragstart', clearHold);
   };
 
-  const handleHardReset = () => {
+  const handleHardReset = async () => {
     const confirmed = window.confirm('전체 초기화를 진행하시겠습니까? 모든 데이터가 삭제됩니다.');
     if (!confirmed) return;
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.removeItem(STORAGE_KEY);
-    }
+    await deletePersistedState();
     window.location.reload();
   };
 
@@ -1019,7 +1017,9 @@ const badmintonBoard = (() => {
     if (isRestoringState) return;
     if (typeof window === 'undefined') return;
     window.clearTimeout(saveTimer);
-    saveTimer = window.setTimeout(persistState, 200);
+    saveTimer = window.setTimeout(() => {
+      persistState();
+    }, 200);
   };
 
   const getTodayKey = () => {
@@ -1062,13 +1062,34 @@ const badmintonBoard = (() => {
     participants.forEach((member) => updateParticipantStatsDisplay(member.id));
   };
 
-  const persistState = () => {
-    if (typeof window === 'undefined' || !window.localStorage) return;
+  const persistState = async () => {
+    if (typeof window === 'undefined') return;
     const data = buildState();
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      const response = await fetch(STATE_API_ENDPOINT, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ state: data }),
+      });
+      if (!response.ok) {
+        throw new Error(`Unexpected response: ${response.status}`);
+      }
     } catch (error) {
       console.error('상태 저장에 실패했습니다.', error);
+    }
+  };
+
+  const deletePersistedState = async () => {
+    if (typeof window === 'undefined') return;
+    try {
+      const response = await fetch(STATE_API_ENDPOINT, { method: 'DELETE' });
+      if (!response.ok) {
+        throw new Error(`Unexpected response: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('상태 초기화에 실패했습니다.', error);
     }
   };
 
@@ -1122,12 +1143,15 @@ const badmintonBoard = (() => {
     return state;
   };
 
-  const loadState = () => {
-    if (typeof window === 'undefined' || !window.localStorage) return null;
+  const loadState = async () => {
+    if (typeof window === 'undefined') return null;
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (!raw) return null;
-      return JSON.parse(raw);
+      const response = await fetch(STATE_API_ENDPOINT, { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`Unexpected response: ${response.status}`);
+      }
+      const payload = await response.json();
+      return payload?.state || null;
     } catch (error) {
       console.error('상태를 불러오지 못했습니다.', error);
       return null;
@@ -2085,4 +2109,8 @@ const badmintonBoard = (() => {
   return { init };
 })();
 
-document.addEventListener('DOMContentLoaded', badmintonBoard.init);
+document.addEventListener('DOMContentLoaded', () => {
+  badmintonBoard.init()?.catch((error) => {
+    console.error('보드 초기화에 실패했습니다.', error);
+  });
+});
