@@ -59,6 +59,8 @@ const badmintonBoard = (() => {
   let waitlistRowSeq = 0;
   let waitlistCardSeq = 0;
   let currentWaitlistDropTarget = null;
+  const LIST_CARD_ACTION_STACK_WIDTH = 320;
+  let listCardResizeObserver = null;
 
   const getParticipantById = (id) => participants.find((member) => member.id === id);
 
@@ -264,10 +266,52 @@ const badmintonBoard = (() => {
     }
   };
 
+  const ensureListCardResizeObserver = () => {
+    if (listCardResizeObserver || typeof ResizeObserver === 'undefined') {
+      return listCardResizeObserver;
+    }
+    listCardResizeObserver = new ResizeObserver((entries) => {
+      entries.forEach((entry) => {
+        updateListCardActionLayout(entry.target, entry.contentRect?.width);
+      });
+    });
+    return listCardResizeObserver;
+  };
+
+  const updateListCardActionLayout = (card, reportedWidth = null) => {
+    if (!card || !card.isConnected || card.classList.contains('on-board')) return;
+    const actions = card.querySelector('.card-actions');
+    if (!actions) return;
+    const width = typeof reportedWidth === 'number' ? reportedWidth : card.getBoundingClientRect().width;
+    const shouldStack = width < LIST_CARD_ACTION_STACK_WIDTH;
+    actions.classList.toggle('card-actions-stacked', shouldStack);
+    actions.classList.toggle('card-actions-inline', !shouldStack);
+  };
+
+  const observeListCardActionLayout = (card) => {
+    if (!card) return;
+    updateListCardActionLayout(card);
+    const observer = ensureListCardResizeObserver();
+    observer?.observe(card);
+  };
+
+  const unobserveListCardActionLayout = (card) => {
+    if (!card || !listCardResizeObserver) return;
+    listCardResizeObserver.unobserve(card);
+  };
+
+  const resetListCardActionObserver = () => {
+    listCardResizeObserver?.disconnect();
+  };
+
   const renderParticipants = () => {
+    if (!participantsListEl) return;
+    resetListCardActionObserver();
     participantsListEl.innerHTML = '';
     participants.forEach((member) => {
-      participantsListEl.appendChild(createListCard(member));
+      const card = createListCard(member);
+      participantsListEl.appendChild(card);
+      observeListCardActionLayout(card);
     });
     updateAllParticipantStats();
   };
@@ -1037,7 +1081,7 @@ const badmintonBoard = (() => {
     nameBlock.appendChild(statsEl);
 
     const actions = document.createElement('div');
-    actions.className = 'card-actions';
+    actions.className = 'card-actions card-actions-inline';
 
     const shuttleBtn = createShuttleButton(member.id);
     const deleteBtn = createDeleteButton({
@@ -1206,7 +1250,9 @@ const badmintonBoard = (() => {
       status: 'pending',
     };
     participants.push(newParticipant);
-    participantsListEl.appendChild(createListCard(newParticipant));
+    const card = createListCard(newParticipant);
+    participantsListEl.appendChild(card);
+    observeListCardActionLayout(card);
     setParticipantJoinedAt(newParticipant.id, new Date());
     participantNameInput.value = '';
     participantNameInput.focus();
@@ -1224,7 +1270,10 @@ const badmintonBoard = (() => {
       participants.splice(index, 1);
     }
     const card = document.getElementById(`participant-${participantId}`);
-    card?.remove();
+    if (card) {
+      unobserveListCardActionLayout(card);
+      card.remove();
+    }
     removeBoardCardsByParticipant(participantId);
     removeWaitlistEntries(participantId);
     schedulePersist();
