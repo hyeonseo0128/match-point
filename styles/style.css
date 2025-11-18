@@ -621,6 +621,19 @@ body{
   font-size:0.95rem;
   background:#fff;
 }
+.is-disabled{
+  opacity:0.5!important;
+  cursor:not-allowed!important;
+  pointer-events:none!important;
+}
+.read-only-mode .card,
+.read-only-mode .wait-card{
+  cursor:default;
+}
+.read-only-mode .card .card-actions,
+.read-only-mode .wait-card-remove{
+  pointer-events:none;
+}
 .field-group select,
 .participant-modal-field select{
   border:1px solid var(--border);

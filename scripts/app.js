@@ -71,7 +71,9 @@ const badmintonBoard = (() => {
   const NAME_RESET_HOLD_DURATION = 2000;
   const SHUTTLE_IMAGE = './assets/image/shuttlecock.png';
   const STATE_API_ENDPOINT = '/api/state';
+  const CAPABILITIES_ENDPOINT = '/api/capabilities';
   const history = {};
+  let isReadOnlyMode = false;
   let isRestoringState = false;
   let saveTimer = null;
   let boardEl;
@@ -113,6 +115,89 @@ const badmintonBoard = (() => {
   let activeWaitlistCourtMenu = null;
   let participantSortSelect;
 
+  const disableElement = (element) => {
+    if (!element) return;
+    element.disabled = true;
+    element.setAttribute('aria-disabled', 'true');
+    element.classList.add('is-disabled');
+  };
+
+  const disableInputsBySelector = (selector) => {
+    document.querySelectorAll(selector).forEach((node) => {
+      node.disabled = true;
+      node.classList.add('is-disabled');
+    });
+  };
+
+  const disableCardInteractions = () => {
+    if (!isReadOnlyMode) return;
+    document.querySelectorAll('.card').forEach((card) => {
+      card.draggable = false;
+      card.querySelectorAll('button').forEach((button) => {
+        button.disabled = true;
+        button.setAttribute('aria-disabled', 'true');
+      });
+    });
+    document.querySelectorAll('.wait-card').forEach((card) => {
+      card.draggable = false;
+      const btn = card.querySelector('.wait-card-remove');
+      if (btn) {
+        btn.disabled = true;
+        btn.setAttribute('aria-disabled', 'true');
+      }
+    });
+    document.querySelectorAll('.court-remove, .court-complete, .waitlist-row-remove').forEach((button) => {
+      button.disabled = true;
+      button.setAttribute('aria-disabled', 'true');
+    });
+  };
+
+  const loadCapabilities = async () => {
+    if (typeof window === 'undefined') return { readOnly: false };
+    try {
+      const response = await fetch(CAPABILITIES_ENDPOINT, { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`Unexpected response: ${response.status}`);
+      }
+      return response.json();
+    } catch (error) {
+      console.error('사용 권한 정보를 불러오지 못했습니다.', error);
+      return { readOnly: false };
+    }
+  };
+
+  const applyReadOnlyUiState = () => {
+    if (!isReadOnlyMode) return;
+    document.body?.classList.add('read-only-mode');
+    disableElement(addParticipantBtn);
+    disableElement(addCourtBtn);
+    disableElement(resetBtn);
+    disableElement(addWaitlistRowBtn);
+    disableElement(hardResetBtn);
+    if (participantNameInput) {
+      participantNameInput.disabled = true;
+      participantNameInput.placeholder = '뷰어 모드에서는 수정할 수 없습니다.';
+      participantNameInput.classList.add('is-disabled');
+    }
+    if (participantGradeSelect) {
+      participantGradeSelect.disabled = true;
+      participantGradeSelect.classList.add('is-disabled');
+    }
+    disableInputsBySelector('input[name="participantColor"]');
+    if (participantDetailCountInput) {
+      participantDetailCountInput.disabled = true;
+      participantDetailCountInput.classList.add('is-disabled');
+    }
+    disableElement(participantDetailSaveBtn);
+    disableElement(participantDetailCountIncreaseBtn);
+    disableElement(participantDetailCountDecreaseBtn);
+    disableInputsBySelector('input[name="participantDetailColor"]');
+    if (participantDetailGradeSelect) {
+      participantDetailGradeSelect.disabled = true;
+    }
+    disableCardInteractions();
+  };
+
   const getParticipantById = (id) => participants.find((member) => member.id === id);
 
   const init = async () => {
@@ -145,6 +230,12 @@ const badmintonBoard = (() => {
 
     if (!boardEl || !participantsListEl) return;
 
+    const capabilities = await loadCapabilities();
+    isReadOnlyMode = Boolean(capabilities?.readOnly);
+    if (isReadOnlyMode) {
+      document.body?.classList.add('read-only-mode');
+    }
+
     const savedState = await loadState();
     if (savedState?.participants?.length) {
       participants.length = 0;
@@ -163,7 +254,9 @@ const badmintonBoard = (() => {
       });
     }
     renderParticipants();
-    enableListDrop();
+    if (!isReadOnlyMode) {
+      enableListDrop();
+    }
     if (savedState) {
       applySavedState(savedState);
     } else {
@@ -172,25 +265,30 @@ const badmintonBoard = (() => {
       createCourt(4);
       schedulePersist();
     }
-
-    addCourtBtn?.addEventListener('click', handleAddCourt);
-    resetBtn?.addEventListener('click', resetBoardPositions);
-    addParticipantBtn?.addEventListener('click', handleAddParticipant);
-    addWaitlistRowBtn?.addEventListener('click', handleAddWaitlistRow);
-    downloadHistoryBtn?.addEventListener('click', handleDownloadHistory);
-    hardResetBtn?.addEventListener('click', handleHardReset);
-    participantNameInput?.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        handleAddParticipant();
-      }
-    });
-    participantSortSelect?.addEventListener('change', handleParticipantSortChange);
-    bindWaitlistReorderEvents();
     bindParticipantDetailModal();
-    initSlotParticipantPicker();
-    document.addEventListener('click', handleWaitlistCourtMenuDocumentClick);
-    document.addEventListener('keydown', handleWaitlistCourtMenuKeydown);
+
+    participantSortSelect?.addEventListener('change', handleParticipantSortChange);
+
+    if (!isReadOnlyMode) {
+      addCourtBtn?.addEventListener('click', handleAddCourt);
+      resetBtn?.addEventListener('click', resetBoardPositions);
+      addParticipantBtn?.addEventListener('click', handleAddParticipant);
+      addWaitlistRowBtn?.addEventListener('click', handleAddWaitlistRow);
+      hardResetBtn?.addEventListener('click', handleHardReset);
+      participantNameInput?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          handleAddParticipant();
+        }
+      });
+      bindWaitlistReorderEvents();
+      initSlotParticipantPicker();
+      document.addEventListener('click', handleWaitlistCourtMenuDocumentClick);
+      document.addEventListener('keydown', handleWaitlistCourtMenuKeydown);
+    } else {
+      applyReadOnlyUiState();
+    }
+    downloadHistoryBtn?.addEventListener('click', handleDownloadHistory);
   };
 
   const bindWaitlistReorderEvents = () => {
@@ -209,15 +307,17 @@ const badmintonBoard = (() => {
       }
     });
     participantDetailCloseBtn?.addEventListener('click', closeParticipantDetail);
-    participantDetailSaveBtn?.addEventListener('click', handleParticipantDetailSave);
-    participantDetailCountIncreaseBtn?.addEventListener('click', () => adjustParticipantDetailCount(1));
-    participantDetailCountDecreaseBtn?.addEventListener('click', () => adjustParticipantDetailCount(-1));
-    participantDetailCountInput?.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        handleParticipantDetailSave();
-      }
-    });
+    if (!isReadOnlyMode) {
+      participantDetailSaveBtn?.addEventListener('click', handleParticipantDetailSave);
+      participantDetailCountIncreaseBtn?.addEventListener('click', () => adjustParticipantDetailCount(1));
+      participantDetailCountDecreaseBtn?.addEventListener('click', () => adjustParticipantDetailCount(-1));
+      participantDetailCountInput?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          handleParticipantDetailSave();
+        }
+      });
+    }
     document.addEventListener('keydown', handleParticipantDetailKeydown);
   };
 
@@ -295,8 +395,10 @@ const badmintonBoard = (() => {
       const arrivalLabel = formatArrivalTime(session?.joinedAt || null);
       participantDetailArrivalEl.textContent = arrivalLabel;
     }
-    participantDetailCountInput?.focus();
-    participantDetailCountInput?.select();
+    if (!isReadOnlyMode) {
+      participantDetailCountInput?.focus();
+      participantDetailCountInput?.select();
+    }
   };
 
   const closeParticipantDetail = () => {
@@ -307,6 +409,10 @@ const badmintonBoard = (() => {
   };
 
   const handleParticipantDetailSave = () => {
+    if (isReadOnlyMode) {
+      closeParticipantDetail();
+      return;
+    }
     if (!activeDetailParticipantId) {
       closeParticipantDetail();
       return;
@@ -687,6 +793,9 @@ const badmintonBoard = (() => {
     });
     updateAllParticipantStats();
     refreshSlotPickerOptions();
+    if (isReadOnlyMode) {
+      disableCardInteractions();
+    }
   };
 
   const getSortedParticipants = () => {
@@ -925,14 +1034,19 @@ const badmintonBoard = (() => {
       event.stopPropagation();
     };
 
-    button.addEventListener('pointerdown', stopEvent);
-    button.addEventListener('pointerup', stopEvent);
-    button.addEventListener('dragstart', (event) => event.preventDefault());
+    if (isReadOnlyMode) {
+      button.disabled = true;
+      button.setAttribute('aria-hidden', 'true');
+    } else {
+      button.addEventListener('pointerdown', stopEvent);
+      button.addEventListener('pointerup', stopEvent);
+      button.addEventListener('dragstart', (event) => event.preventDefault());
 
-    button.addEventListener('click', (event) => {
-      event.stopPropagation();
-      markParticipantSubmitted(participantId);
-    });
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        markParticipantSubmitted(participantId);
+      });
+    }
 
     return button;
   };
@@ -943,10 +1057,15 @@ const badmintonBoard = (() => {
     button.className = 'card-delete';
     button.setAttribute('aria-label', label);
     button.innerHTML = '&times;';
-    button.addEventListener('click', (event) => {
-      event.stopPropagation();
-      onClick();
-    });
+    if (isReadOnlyMode) {
+      button.disabled = true;
+      button.setAttribute('aria-hidden', 'true');
+    } else {
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        onClick();
+      });
+    }
     return button;
   };
 
@@ -978,6 +1097,10 @@ const badmintonBoard = (() => {
   };
 
   const handleHardReset = async () => {
+    if (isReadOnlyMode) {
+      window.alert('뷰어 모드에서는 초기화를 할 수 없습니다.');
+      return;
+    }
     const confirmed = window.confirm('전체 초기화를 진행하시겠습니까? 모든 데이터가 삭제됩니다.');
     if (!confirmed) return;
     await deletePersistedState();
@@ -1014,6 +1137,7 @@ const badmintonBoard = (() => {
   };
 
   const schedulePersist = () => {
+    if (isReadOnlyMode) return;
     if (isRestoringState) return;
     if (typeof window === 'undefined') return;
     window.clearTimeout(saveTimer);
@@ -1063,6 +1187,7 @@ const badmintonBoard = (() => {
   };
 
   const persistState = async () => {
+    if (isReadOnlyMode) return;
     if (typeof window === 'undefined') return;
     const data = buildState();
     try {
@@ -1082,6 +1207,7 @@ const badmintonBoard = (() => {
   };
 
   const deletePersistedState = async () => {
+    if (isReadOnlyMode) return;
     if (typeof window === 'undefined') return;
     try {
       const response = await fetch(STATE_API_ENDPOINT, { method: 'DELETE' });
@@ -1224,6 +1350,9 @@ const badmintonBoard = (() => {
       }
     } finally {
       isRestoringState = false;
+      if (isReadOnlyMode) {
+        disableCardInteractions();
+      }
       schedulePersist();
     }
   };
@@ -1239,6 +1368,7 @@ const badmintonBoard = (() => {
   };
 
   const handleAddWaitlistRow = () => {
+    if (isReadOnlyMode) return;
     addWaitlistRow();
   };
 
@@ -1331,7 +1461,7 @@ const badmintonBoard = (() => {
   const createWaitlistCard = (member) => {
     const card = document.createElement('div');
     card.className = 'wait-card';
-    card.draggable = true;
+    card.draggable = !isReadOnlyMode;
     card.id = `wait-card-${waitlistCardSeq++}`;
     card.dataset.participantId = member.id;
     card.dataset.previousSlotId = '';
@@ -1348,16 +1478,20 @@ const badmintonBoard = (() => {
     removeBtn.className = 'wait-card-remove';
     removeBtn.setAttribute('aria-label', `${member.name} 대기 해제`);
     removeBtn.innerHTML = '&times;';
-    removeBtn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      removeWaitlistCard(card);
-    });
+    if (!isReadOnlyMode) {
+      removeBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        removeWaitlistCard(card);
+      });
+    }
 
     card.appendChild(nameEl);
     card.appendChild(removeBtn);
 
-    card.addEventListener('dragstart', (event) => handleWaitlistDragStart(event, card));
-    card.addEventListener('dragend', () => handleWaitlistDragEnd(card));
+    if (!isReadOnlyMode) {
+      card.addEventListener('dragstart', (event) => handleWaitlistDragStart(event, card));
+      card.addEventListener('dragend', () => handleWaitlistDragEnd(card));
+    }
 
     return card;
   };
@@ -1393,6 +1527,7 @@ const badmintonBoard = (() => {
   };
 
   const bindWaitlistSlot = (slot) => {
+    if (isReadOnlyMode) return;
     slot.addEventListener('dragover', (event) => {
       event.preventDefault();
       slot.classList.add('waitlist-slot-active');
@@ -1587,7 +1722,7 @@ const badmintonBoard = (() => {
   const createListCard = (member) => {
     const card = document.createElement('div');
     card.className = 'card';
-    card.draggable = true;
+    card.draggable = !isReadOnlyMode;
     card.id = `participant-${member.id}`;
     card.dataset.participantId = member.id;
     const color = member.color || 'blue';
@@ -1643,10 +1778,12 @@ const badmintonBoard = (() => {
     card.appendChild(meta);
     applySubmissionState(card, member.status || 'pending');
 
-    card.addEventListener('dragstart', (event) => handleListDragStart(event, card));
-    card.addEventListener('dragend', () => {
-      card.classList.remove('dragging');
-    });
+    if (!isReadOnlyMode) {
+      card.addEventListener('dragstart', (event) => handleListDragStart(event, card));
+      card.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+      });
+    }
     card.addEventListener('click', () => openParticipantDetail(member.id));
 
     return card;
@@ -1655,7 +1792,7 @@ const badmintonBoard = (() => {
   const createBoardCard = (member) => {
     const card = document.createElement('div');
     card.className = 'card on-board';
-    card.draggable = true;
+    card.draggable = !isReadOnlyMode;
     card.id = `board-${member.id}-${boardCardSeq++}`;
     card.dataset.participantId = member.id;
     card.dataset.previousSlotId = '';
@@ -1695,8 +1832,10 @@ const badmintonBoard = (() => {
     card.appendChild(meta);
     applySubmissionState(card, member.status || 'pending');
 
-    card.addEventListener('dragstart', (event) => handleBoardDragStart(event, card));
-    card.addEventListener('dragend', () => handleBoardDragEnd(card));
+    if (!isReadOnlyMode) {
+      card.addEventListener('dragstart', (event) => handleBoardDragStart(event, card));
+      card.addEventListener('dragend', () => handleBoardDragEnd(card));
+    }
     card.addEventListener('click', () => openParticipantDetail(member.id));
 
     return card;
@@ -1781,6 +1920,7 @@ const badmintonBoard = (() => {
   };
 
   const handleAddParticipant = () => {
+    if (isReadOnlyMode) return;
     if (!participantNameInput) return;
     const name = participantNameInput.value.trim();
     if (!name) {
@@ -1839,6 +1979,10 @@ const badmintonBoard = (() => {
   };
 
   const handleAddCourt = () => {
+    if (isReadOnlyMode) {
+      window.alert('뷰어 모드에서는 코트를 추가할 수 없습니다.');
+      return;
+    }
     const number = requestCourtNumber({
       message: '추가할 코트 번호를 입력하세요.',
       defaultValue: '',
@@ -1981,6 +2125,7 @@ const badmintonBoard = (() => {
   };
 
   const bindSlot = (slot) => {
+    if (isReadOnlyMode) return;
     slot.addEventListener('dragover', (event) => {
       event.preventDefault();
       slot.classList.add('slot-active');
@@ -2038,6 +2183,7 @@ const badmintonBoard = (() => {
   };
 
   const handleSlotClick = (event, slot) => {
+    if (isReadOnlyMode) return;
     if (!slot || slot.dataset.occupantId) return;
     if (event.defaultPrevented) return;
     openSlotParticipantPicker(slot);
