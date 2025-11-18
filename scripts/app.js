@@ -396,12 +396,18 @@ const badmintonBoard = (() => {
     if (!participantId || !slotPickerActiveSlot) return;
     const participant = getParticipantById(participantId);
     if (!participant) return;
-    const existing = boardEl.querySelector(`.slot .card[data-participant-id="${participant.id}"]`);
-    if (existing) {
-      removeBoardCard(existing);
+    const slotType = slotPickerActiveSlot.dataset.slotType || 'court';
+    if (slotType === 'waitlist') {
+      const waitCard = createWaitlistCard(participant);
+      placeWaitlistCardInSlot(waitCard, slotPickerActiveSlot);
+    } else {
+      const existing = boardEl.querySelector(`.slot .card[data-participant-id="${participant.id}"]`);
+      if (existing) {
+        removeBoardCard(existing);
+      }
+      const card = createBoardCard(participant);
+      placeCardInSlot(card, slotPickerActiveSlot);
     }
-    const card = createBoardCard(participant);
-    placeCardInSlot(card, slotPickerActiveSlot);
     closeSlotParticipantPicker();
   };
 
@@ -881,6 +887,7 @@ const badmintonBoard = (() => {
       const slot = document.createElement('div');
       slot.className = 'waitlist-slot';
       slot.dataset.slotId = `${rowId}-slot-${i + 1}`;
+      slot.dataset.slotType = 'waitlist';
       bindWaitlistSlot(slot);
       slotsRow.appendChild(slot);
     }
@@ -911,6 +918,9 @@ const badmintonBoard = (() => {
   const removeWaitlistRow = (row) => {
     const cards = row.querySelectorAll('.wait-card');
     cards.forEach((card) => removeWaitlistCard(card));
+    if (slotPickerActiveSlot && row.contains(slotPickerActiveSlot)) {
+      closeSlotParticipantPicker();
+    }
     row.remove();
     refreshWaitlistRowLabels();
     ensureWaitlistRow();
@@ -1018,6 +1028,8 @@ const badmintonBoard = (() => {
         placeWaitlistCardInSlot(waitCard, slot);
       }
     });
+
+    slot.addEventListener('click', (event) => handleSlotClick(event, slot));
   };
 
   const placeWaitlistCardInSlot = (card, slot) => {
@@ -1030,6 +1042,9 @@ const badmintonBoard = (() => {
     slot.classList.add('filled');
     card.dataset.previousSlotId = slot.dataset.slotId || '';
     slot.appendChild(card);
+    if (slotPickerActiveSlot === slot) {
+      closeSlotParticipantPicker();
+    }
     schedulePersist();
   };
 
@@ -1477,6 +1492,7 @@ const badmintonBoard = (() => {
         const slot = document.createElement('div');
         slot.className = 'slot';
         slot.dataset.slotId = `${court.dataset.courtId}-slot-${slotIndex}`;
+        slot.dataset.slotType = 'court';
         column.appendChild(slot);
         bindSlot(slot);
       }
