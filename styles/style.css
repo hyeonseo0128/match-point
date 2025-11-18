@@ -728,6 +728,14 @@ body{
   width:100%;
   justify-content:center;
 }
+.hard-reset-cta{
+  align-self:stretch;
+  margin-top:8px;
+}
+.hard-reset-cta .btn{
+  width:100%;
+  justify-content:center;
+}
 
 .card{
   width:170px;
