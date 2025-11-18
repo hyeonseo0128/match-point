@@ -42,10 +42,48 @@ const badmintonBoard = (() => {
   });
   const normalizeParticipantColor = (color) => (PARTICIPANT_COLORS.includes(color) ? color : 'blue');
   const normalizeParticipantGrade = (grade) => (PARTICIPANT_GRADES.includes(grade) ? grade : DEFAULT_PARTICIPANT_GRADE);
+  function normalizeCountValue(value) {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) return 0;
+    return Math.max(0, Math.floor(numericValue));
+  }
+  const normalizeSessionMatches = (matches) => {
+    if (!matches || typeof matches !== 'object') {
+      return {};
+    }
+    return Object.entries(matches).reduce((acc, [opponentId, value]) => {
+      const sanitizedKey = String(opponentId);
+      const normalizedCount = normalizeCountValue(value);
+      if (sanitizedKey && normalizedCount > 0) {
+        acc[sanitizedKey] = normalizedCount;
+      }
+      return acc;
+    }, {});
+  };
+  const normalizeSessionEntry = (entry) => {
+    if (typeof entry === 'number') {
+      return { count: normalizeCountValue(entry), joinedAt: null, matches: {} };
+    }
+    if (!entry || typeof entry !== 'object') {
+      return { count: 0, joinedAt: null, matches: {} };
+    }
+    return {
+      count: normalizeCountValue(entry.count),
+      joinedAt: entry.joinedAt || null,
+      matches: normalizeSessionMatches(entry.matches),
+    };
+  };
+  const normalizeParticipantSessions = (sessions = {}) => {
+    const normalized = {};
+    Object.entries(sessions || {}).forEach(([key, entry]) => {
+      normalized[key] = normalizeSessionEntry(entry);
+    });
+    return normalized;
+  };
   const normalizeParticipants = () => {
     participants.forEach((member) => {
       member.status = member.status || 'pending';
-      member.sessions = member.sessions || {};
+      member.sessions = normalizeParticipantSessions(member.sessions);
       member.color = normalizeParticipantColor(member.color);
       member.grade = normalizeParticipantGrade(member.grade);
     });
@@ -98,6 +136,8 @@ const badmintonBoard = (() => {
   let participantDetailCountDecreaseBtn;
   let participantDetailColorInputs = [];
   let participantDetailGradeSelect;
+  let participantDetailMatchListEl;
+  let participantDetailMatchEmptyEl;
   let activeDetailParticipantId = null;
   let participantSortMode = DEFAULT_PARTICIPANT_SORT_MODE;
   const usedCourtNumbers = new Set();
@@ -326,6 +366,8 @@ const badmintonBoard = (() => {
     participantDetailCountDecreaseBtn = document.getElementById('participantDetailCountDecrease');
     participantDetailColorInputs = [...document.querySelectorAll('input[name="participantDetailColor"]')];
     participantDetailGradeSelect = document.getElementById('participantDetailGradeSelect');
+    participantDetailMatchListEl = document.getElementById('participantMatchHistoryList');
+    participantDetailMatchEmptyEl = document.getElementById('participantMatchHistoryEmpty');
     slotParticipantPickerEl = document.getElementById('slotParticipantPicker');
     slotPickerSearchInput = document.getElementById('slotPickerSearchInput');
     slotPickerListEl = document.getElementById('slotPickerList');
@@ -475,6 +517,7 @@ const badmintonBoard = (() => {
       const arrivalLabel = formatArrivalTime(session?.joinedAt || null);
       participantDetailArrivalEl.textContent = arrivalLabel;
     }
+    renderParticipantMatchHistory(participantId);
     if (!isReadOnlyMode) {
       participantDetailCountInput?.focus();
       participantDetailCountInput?.select();
@@ -971,11 +1014,6 @@ const badmintonBoard = (() => {
     schedulePersist();
   };
 
-  const normalizeCountValue = (value) => {
-    const numericValue = Number(value);
-    if (!Number.isFinite(numericValue)) return 0;
-    return Math.max(0, Math.floor(numericValue));
-  };
 
   const getParticipantSessionForDate = (participantId, dateKey = null) => {
     const participant = getParticipantById(participantId);
@@ -983,14 +1021,7 @@ const badmintonBoard = (() => {
     const targetDate = dateKey || getTodayKey();
     participant.sessions = participant.sessions || {};
     let entry = participant.sessions[targetDate];
-    if (typeof entry === 'number') {
-      entry = { count: normalizeCountValue(entry), joinedAt: null };
-    } else if (!entry || typeof entry !== 'object') {
-      entry = { count: 0, joinedAt: null };
-    } else {
-      entry.count = normalizeCountValue(entry.count);
-      entry.joinedAt = entry.joinedAt || null;
-    }
+    entry = normalizeSessionEntry(entry);
     participant.sessions[targetDate] = entry;
     return entry;
   };
@@ -1252,6 +1283,54 @@ const badmintonBoard = (() => {
     } catch {
       return '기록 없음';
     }
+  };
+
+  const getParticipantMatchHistoryEntries = (participantId) => {
+    const session = getParticipantTodaySession(participantId);
+    if (!session) return [];
+    const entries = Object.entries(session.matches || {}).map(([opponentId, count]) => {
+      const opponent = getParticipantById(opponentId);
+      return {
+        opponentId,
+        opponentName: opponent?.name || '이름 미상',
+        count: normalizeCountValue(count),
+      };
+    });
+    return entries.sort((a, b) => {
+      const diff = compareNumbers(b.count, a.count);
+      if (diff !== 0) return diff;
+      return a.opponentName.localeCompare(b.opponentName, 'ko-KR');
+    });
+  };
+
+  const renderParticipantMatchHistory = (participantId) => {
+    if (!participantDetailMatchListEl || !participantDetailMatchEmptyEl) return;
+    participantDetailMatchListEl.innerHTML = '';
+    const entries = getParticipantMatchHistoryEntries(participantId);
+    if (!entries.length) {
+      participantDetailMatchEmptyEl.hidden = false;
+      participantDetailMatchListEl.hidden = true;
+      return;
+    }
+    participantDetailMatchEmptyEl.hidden = true;
+    participantDetailMatchListEl.hidden = false;
+    entries.forEach(({ opponentId, opponentName, count }) => {
+      const item = document.createElement('li');
+      item.className = 'match-history-item';
+      item.dataset.opponentId = opponentId;
+
+      const nameEl = document.createElement('span');
+      nameEl.className = 'match-history-name';
+      nameEl.textContent = opponentName;
+
+      const countEl = document.createElement('span');
+      countEl.className = 'match-history-count';
+      countEl.textContent = `${count}게임`;
+
+      item.appendChild(nameEl);
+      item.appendChild(countEl);
+      participantDetailMatchListEl.appendChild(item);
+    });
   };
 
   const updateParticipantStatsDisplay = (participantId) => {
@@ -1731,6 +1810,25 @@ const badmintonBoard = (() => {
     }
   };
 
+  const recordCourtMatchHistory = (participantIds) => {
+    if (!Array.isArray(participantIds)) return;
+    const uniqueIds = [...new Set(participantIds.filter(Boolean))];
+    if (uniqueIds.length < 2) return;
+    uniqueIds.forEach((participantId) => {
+      const session = getParticipantTodaySession(participantId);
+      if (!session) return;
+      session.matches = session.matches || {};
+      uniqueIds.forEach((opponentId) => {
+        if (opponentId === participantId) return;
+        const previous = session.matches[opponentId] || 0;
+        session.matches[opponentId] = normalizeCountValue(previous + 1);
+      });
+    });
+    if (activeDetailParticipantId && uniqueIds.includes(activeDetailParticipantId)) {
+      renderParticipantMatchHistory(activeDetailParticipantId);
+    }
+  };
+
   const handleCourtGameComplete = (court) => {
     if (!court) return;
     const slots = [...court.querySelectorAll('.slot')];
@@ -1749,6 +1847,7 @@ const badmintonBoard = (() => {
       window.alert('이 코트에 배치된 멤버가 없습니다.');
       return;
     }
+    recordCourtMatchHistory(participants.map(({ participantId }) => participantId));
     participants.forEach(({ participantId, card }) => {
       incrementParticipantGameCount(participantId);
       removeBoardCard(card);
