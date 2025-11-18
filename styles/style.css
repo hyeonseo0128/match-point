@@ -337,17 +337,6 @@ body{
   opacity:.6;
   box-shadow:none;
 }
-.wait-card-identity{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  min-width:0;
-}
-.wait-card .grade-badge{
-  width:24px;
-  height:24px;
-  border-width:1px;
-}
 .wait-card .name{
   font-weight:600;
   color:var(--headline);

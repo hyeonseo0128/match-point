@@ -1319,12 +1319,6 @@ const badmintonBoard = (() => {
     nameEl.className = 'name';
     nameEl.textContent = member.name;
 
-    const identity = document.createElement('div');
-    identity.className = 'wait-card-identity';
-    const gradeBadge = createGradeBadgeElement(grade);
-    identity.appendChild(gradeBadge);
-    identity.appendChild(nameEl);
-
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'wait-card-remove';
@@ -1335,7 +1329,7 @@ const badmintonBoard = (() => {
       removeWaitlistCard(card);
     });
 
-    card.appendChild(identity);
+    card.appendChild(nameEl);
     card.appendChild(removeBtn);
 
     card.addEventListener('dragstart', (event) => handleWaitlistDragStart(event, card));
@@ -1669,13 +1663,7 @@ const badmintonBoard = (() => {
     actions.appendChild(shuttleBtn);
     actions.appendChild(deleteBtn);
 
-    const identityRow = document.createElement('div');
-    identityRow.className = 'name-row';
-    const gradeBadge = createGradeBadgeElement(grade);
-    identityRow.appendChild(gradeBadge);
-    identityRow.appendChild(nameEl);
-
-    infoRow.appendChild(identityRow);
+    infoRow.appendChild(nameEl);
     infoRow.appendChild(actions);
 
     meta.appendChild(infoRow);
