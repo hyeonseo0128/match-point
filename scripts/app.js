@@ -411,6 +411,16 @@ const badmintonBoard = (() => {
 
   const getParticipantById = (id) => participants.find((member) => member.id === id);
 
+  const getWindowScrollTop = () => {
+    if (typeof window === 'undefined') return 0;
+    return window.scrollY || document.documentElement?.scrollTop || document.body?.scrollTop || 0;
+  };
+
+  const restoreWindowScrollTop = (value) => {
+    if (typeof window === 'undefined') return;
+    window.scrollTo(0, value);
+  };
+
   const init = async () => {
     boardEl = document.getElementById('gameBoard');
     participantsListEl = document.getElementById('participantsList');
@@ -1147,6 +1157,8 @@ const badmintonBoard = (() => {
       }
       const card = createBoardCard(participant);
       placeCardInSlot(card, slotPickerActiveSlot);
+      incrementParticipantGameCount(participant.id);
+      renderParticipants();
     }
     closeSlotParticipantPicker();
   };
@@ -1164,6 +1176,7 @@ const badmintonBoard = (() => {
   };
 
   const renderParticipants = () => {
+    const previousScrollTop = getWindowScrollTop();
     if (!participantsListEl) return;
     if (participantSortSelect) {
       participantSortSelect.value = participantSortMode;
@@ -1182,6 +1195,12 @@ const badmintonBoard = (() => {
       disableCardInteractions();
     }
     updateAllParticipantLessonStates();
+    const restore = () => restoreWindowScrollTop(previousScrollTop);
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(restore);
+    } else {
+      restore();
+    }
   };
 
   const getSortedParticipants = () => {
@@ -1914,8 +1933,15 @@ const badmintonBoard = (() => {
   };
 
   const removeWaitlistRow = (row) => {
+    if (!row) return;
     const cards = row.querySelectorAll('.wait-card');
-    cards.forEach((card) => removeWaitlistCard(card));
+    cards.forEach((card) => removeWaitlistCard(card, { skipRowCleanup: true }));
+    destroyWaitlistRowElement(row);
+    schedulePersist();
+  };
+
+  const destroyWaitlistRowElement = (row) => {
+    if (!row) return;
     closeWaitlistCourtMenu(row);
     if (slotPickerActiveSlot && row.contains(slotPickerActiveSlot)) {
       closeSlotParticipantPicker();
@@ -1923,7 +1949,6 @@ const badmintonBoard = (() => {
     row.remove();
     refreshWaitlistRowLabels();
     ensureWaitlistRow();
-    schedulePersist();
   };
 
   const createWaitlistCard = (member) => {
@@ -2065,11 +2090,22 @@ const badmintonBoard = (() => {
     slot.classList.remove('filled');
   };
 
-  const removeWaitlistCard = (card) => {
+  const removeWaitlistCard = (card, options = {}) => {
+    if (!card) return;
+    const row = card.closest('.waitlist-row');
     freeWaitlistSlot(card);
     card.dataset.previousSlotId = '';
     card.remove();
+    if (!options.skipRowCleanup) {
+      cleanupWaitlistRowIfEmpty(row);
+    }
     schedulePersist();
+  };
+
+  const cleanupWaitlistRowIfEmpty = (row) => {
+    if (!row) return;
+    if (row.querySelector('.wait-card')) return;
+    destroyWaitlistRowElement(row);
   };
 
   const removeWaitlistCardById = (cardId) => {
@@ -2159,8 +2195,7 @@ const badmintonBoard = (() => {
       return;
     }
     recordCourtMatchHistory(participants.map(({ participantId }) => participantId));
-    participants.forEach(({ participantId, card }) => {
-      incrementParticipantGameCount(participantId);
+    participants.forEach(({ card }) => {
       removeBoardCard(card);
     });
     renderParticipants();
@@ -2187,6 +2222,7 @@ const badmintonBoard = (() => {
     }
     let slotIndex = 0;
 
+    let didUpdateCounts = false;
     for (const { participant, cardId } of participants) {
       let targetSlot = null;
       while (slotIndex < orderedSlots.length && !targetSlot) {
@@ -2205,9 +2241,14 @@ const badmintonBoard = (() => {
       } else {
         removeWaitlistEntries(participant.id);
       }
+      incrementParticipantGameCount(participant.id);
+      didUpdateCounts = true;
     }
     handleWaitlistRowDragEnd(row);
     closeWaitlistCourtMenu(row);
+    if (didUpdateCounts) {
+      renderParticipants();
+    }
     schedulePersist();
   };
 
@@ -2652,6 +2693,8 @@ const badmintonBoard = (() => {
         }
         const boardCard = createBoardCard(member);
         placeCardInSlot(boardCard, slot);
+        incrementParticipantGameCount(member.id);
+        renderParticipants();
       } else if (payload.source === 'board' && payload.cardId) {
         const card = document.getElementById(payload.cardId);
         if (!card) return;
@@ -2675,6 +2718,8 @@ const badmintonBoard = (() => {
         }
         const boardCard = createBoardCard(member);
         placeCardInSlot(boardCard, slot);
+        incrementParticipantGameCount(member.id);
+        renderParticipants();
       }
     });
 
