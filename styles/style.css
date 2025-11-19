@@ -24,6 +24,11 @@ body{
   flex-direction:column;
 }
 
+html.modal-scroll-locked,
+body.modal-scroll-locked{
+  overflow:hidden;
+}
+
 .topbar{
   padding:24px 10vw 16px;
   border-bottom:1px solid var(--border);

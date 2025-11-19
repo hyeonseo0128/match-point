@@ -159,6 +159,39 @@ const badmintonBoard = (() => {
   let participantSortSelect;
   let stateEventSource = null;
   let stateReloadTimer = null;
+  const MODAL_SCROLL_LOCK_CLASS = 'modal-scroll-locked';
+  let modalScrollLockCount = 0;
+  let modalScrollLockScrollTop = 0;
+
+  const lockModalScroll = () => {
+    modalScrollLockCount += 1;
+    if (modalScrollLockCount === 1) {
+      document.documentElement?.classList.add(MODAL_SCROLL_LOCK_CLASS);
+      document.body?.classList.add(MODAL_SCROLL_LOCK_CLASS);
+      modalScrollLockScrollTop =
+        window.scrollY || document.documentElement?.scrollTop || document.body?.scrollTop || 0;
+      if (document.body) {
+        document.body.style.top = `-${modalScrollLockScrollTop}px`;
+        document.body.style.position = 'fixed';
+        document.body.style.width = '100%';
+      }
+    }
+  };
+
+  const unlockModalScroll = () => {
+    if (modalScrollLockCount === 0) return;
+    modalScrollLockCount -= 1;
+    if (modalScrollLockCount === 0) {
+      document.documentElement?.classList.remove(MODAL_SCROLL_LOCK_CLASS);
+      document.body?.classList.remove(MODAL_SCROLL_LOCK_CLASS);
+      if (document.body) {
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+      }
+      window.scrollTo(0, modalScrollLockScrollTop);
+    }
+  };
 
   const disableElement = (element) => {
     if (!element) return;
@@ -512,6 +545,7 @@ const badmintonBoard = (() => {
     const participant = getParticipantById(participantId);
     if (!participant) return;
     activeDetailParticipantId = participantId;
+    const wasOpen = participantDetailModal.classList.contains('is-open');
     participantDetailModal.classList.add('is-open');
     participantDetailModal.setAttribute('aria-hidden', 'false');
     if (participantDetailNameEl) {
@@ -530,13 +564,20 @@ const badmintonBoard = (() => {
       participantDetailCountInput?.focus();
       participantDetailCountInput?.select();
     }
+    if (!wasOpen) {
+      lockModalScroll();
+    }
   };
 
   const closeParticipantDetail = () => {
     if (!participantDetailModal) return;
+    const wasOpen = participantDetailModal.classList.contains('is-open');
     participantDetailModal.classList.remove('is-open');
     participantDetailModal.setAttribute('aria-hidden', 'true');
     activeDetailParticipantId = null;
+    if (wasOpen) {
+      unlockModalScroll();
+    }
   };
 
   const handleParticipantDetailSave = () => {
@@ -816,6 +857,7 @@ const badmintonBoard = (() => {
     }
     slotPickerActiveSlot = slot;
     slotPickerActiveSlot.classList.add('slot-picker-target');
+    const wasOpen = slotParticipantPickerEl.classList.contains('is-open');
     slotParticipantPickerEl.classList.add('is-open');
     slotParticipantPickerEl.setAttribute('aria-hidden', 'false');
     if (slotPickerSearchInput) {
@@ -825,15 +867,22 @@ const badmintonBoard = (() => {
     requestAnimationFrame(() => {
       slotPickerSearchInput?.focus();
     });
+    if (!wasOpen) {
+      lockModalScroll();
+    }
   };
 
   const closeSlotParticipantPicker = () => {
     if (!slotParticipantPickerEl) return;
+    const wasOpen = slotParticipantPickerEl.classList.contains('is-open');
     slotParticipantPickerEl.classList.remove('is-open');
     slotParticipantPickerEl.setAttribute('aria-hidden', 'true');
     if (slotPickerActiveSlot) {
       slotPickerActiveSlot.classList.remove('slot-picker-target');
       slotPickerActiveSlot = null;
+    }
+    if (wasOpen) {
+      unlockModalScroll();
     }
   };
 
