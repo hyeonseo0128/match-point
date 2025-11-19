@@ -28,6 +28,20 @@ const badmintonBoard = (() => {
     E: './assets/image/e_grade.jpg',
     F: './assets/image/f_grade.jpg',
   };
+  const LESSON_TIME_OPTIONS = (() => {
+    const values = [''];
+    for (let hour = 6; hour <= 23; hour += 1) {
+      for (let minute = 0; minute < 60; minute += 10) {
+        const hourLabel = String(hour).padStart(2, '0');
+        const minuteLabel = String(minute).padStart(2, '0');
+        values.push(`${hourLabel}:${minuteLabel}`);
+      }
+    }
+    return values;
+  })();
+  const DEFAULT_LESSON_START = '19:00';
+  const DEFAULT_LESSON_END = '19:30';
+  const LESSON_STATUS_POLL_INTERVAL = 30000;
   const PARTICIPANT_SORT_MODES = {
     GAMES_ASC: 'gamesAsc',
     ARRIVAL: 'arrival',
@@ -42,6 +56,8 @@ const badmintonBoard = (() => {
   });
   const normalizeParticipantColor = (color) => (PARTICIPANT_COLORS.includes(color) ? color : 'blue');
   const normalizeParticipantGrade = (grade) => (PARTICIPANT_GRADES.includes(grade) ? grade : DEFAULT_PARTICIPANT_GRADE);
+  const normalizeLessonTime = (value) => (LESSON_TIME_OPTIONS.includes(value) ? value : '');
+  const normalizeLessonEnabled = (value) => value === true || value === 'true';
   function normalizeCountValue(value) {
     const numericValue = Number(value);
     if (!Number.isFinite(numericValue)) return 0;
@@ -62,15 +78,18 @@ const badmintonBoard = (() => {
   };
   const normalizeSessionEntry = (entry) => {
     if (typeof entry === 'number') {
-      return { count: normalizeCountValue(entry), joinedAt: null, matches: {} };
+      return { count: normalizeCountValue(entry), joinedAt: null, matches: {}, lessonStart: '', lessonEnd: '', lessonEnabled: false };
     }
     if (!entry || typeof entry !== 'object') {
-      return { count: 0, joinedAt: null, matches: {} };
+      return { count: 0, joinedAt: null, matches: {}, lessonStart: '', lessonEnd: '', lessonEnabled: false };
     }
     return {
       count: normalizeCountValue(entry.count),
       joinedAt: entry.joinedAt || null,
       matches: normalizeSessionMatches(entry.matches),
+      lessonStart: normalizeLessonTime(entry.lessonStart),
+      lessonEnd: normalizeLessonTime(entry.lessonEnd),
+      lessonEnabled: normalizeLessonEnabled(entry.lessonEnabled),
     };
   };
   const normalizeParticipantSessions = (sessions = {}) => {
@@ -140,6 +159,11 @@ const badmintonBoard = (() => {
   let participantDetailGradeSelect;
   let participantDetailMatchListEl;
   let participantDetailMatchEmptyEl;
+  let participantLessonStartSelect;
+  let participantLessonEndSelect;
+  let participantLessonCardEl;
+  let participantLessonToggleBtn;
+  let isLessonControlsEnabled = false;
   let activeDetailParticipantId = null;
   let participantSortMode = DEFAULT_PARTICIPANT_SORT_MODE;
   const usedCourtNumbers = new Set();
@@ -159,6 +183,7 @@ const badmintonBoard = (() => {
   let participantSortSelect;
   let stateEventSource = null;
   let stateReloadTimer = null;
+  let lessonStatusTimer = null;
   const MODAL_SCROLL_LOCK_CLASS = 'modal-scroll-locked';
   let modalScrollLockCount = 0;
   let modalScrollLockScrollTop = 0;
@@ -411,6 +436,10 @@ const badmintonBoard = (() => {
     participantDetailGradeSelect = document.getElementById('participantDetailGradeSelect');
     participantDetailMatchListEl = document.getElementById('participantMatchHistoryList');
     participantDetailMatchEmptyEl = document.getElementById('participantMatchHistoryEmpty');
+    participantLessonStartSelect = document.getElementById('participantLessonStartSelect');
+    participantLessonEndSelect = document.getElementById('participantLessonEndSelect');
+    participantLessonCardEl = document.getElementById('participantLessonCard');
+    participantLessonToggleBtn = document.getElementById('participantLessonToggleBtn');
     slotParticipantPickerEl = document.getElementById('slotParticipantPicker');
     slotPickerSearchInput = document.getElementById('slotPickerSearchInput');
     slotPickerListEl = document.getElementById('slotPickerList');
@@ -424,6 +453,7 @@ const badmintonBoard = (() => {
     if (isReadOnlyMode) {
       document.body?.classList.add('read-only-mode');
     }
+    initLessonTimeControls();
 
     const savedState = await loadState();
     applyStateSnapshot(savedState);
@@ -455,6 +485,7 @@ const badmintonBoard = (() => {
     }
     downloadHistoryBtn?.addEventListener('click', handleDownloadHistory);
     initStateStream();
+    startLessonStatusWatcher();
   };
 
   const bindWaitlistReorderEvents = () => {
@@ -485,6 +516,157 @@ const badmintonBoard = (() => {
       });
     }
     document.addEventListener('keydown', handleParticipantDetailKeydown);
+  };
+
+  const initLessonTimeControls = () => {
+    if (!participantLessonStartSelect || !participantLessonEndSelect) return;
+    populateLessonSelect(participantLessonStartSelect, '시작 시간 선택');
+    populateLessonSelect(participantLessonEndSelect, '종료 시간 선택');
+    participantLessonStartSelect.addEventListener('change', handleLessonTimeInputChange);
+    participantLessonEndSelect.addEventListener('change', handleLessonTimeInputChange);
+    participantLessonStartSelect.disabled = true;
+    participantLessonEndSelect.disabled = true;
+    participantLessonToggleBtn?.addEventListener('click', handleLessonToggleClick);
+    if (isReadOnlyMode && participantLessonToggleBtn) {
+      participantLessonToggleBtn.disabled = true;
+    }
+    setLessonControlsEnabled(false);
+    updateLessonCardActiveState();
+  };
+
+  const populateLessonSelect = (select, placeholder) => {
+    if (!select) return;
+    select.innerHTML = '';
+    LESSON_TIME_OPTIONS.forEach((value) => {
+      const option = document.createElement('option');
+      option.value = value;
+      if (!value) {
+        option.textContent = placeholder || '선택 안 함';
+      } else {
+        option.textContent = value;
+      }
+      select.appendChild(option);
+    });
+  };
+
+  const handleLessonTimeInputChange = () => {
+    updateLessonCardActiveState();
+  };
+
+  const handleLessonToggleClick = () => {
+    if (isReadOnlyMode) return;
+    const next = !isLessonControlsEnabled;
+    if (next) {
+      if (!normalizeLessonTime(participantLessonStartSelect?.value)) {
+        setLessonSelectValue(participantLessonStartSelect, DEFAULT_LESSON_START, DEFAULT_LESSON_START);
+      }
+      if (!normalizeLessonTime(participantLessonEndSelect?.value)) {
+        setLessonSelectValue(participantLessonEndSelect, DEFAULT_LESSON_END, DEFAULT_LESSON_END);
+      }
+    } else {
+      if (participantLessonStartSelect) participantLessonStartSelect.value = '';
+      if (participantLessonEndSelect) participantLessonEndSelect.value = '';
+    }
+    setLessonControlsEnabled(next);
+    updateLessonCardActiveState();
+  };
+
+  const setDetailLessonState = ({ enabled, start, end }) => {
+    if (enabled) {
+      setLessonSelectValue(participantLessonStartSelect, start || DEFAULT_LESSON_START, DEFAULT_LESSON_START);
+      setLessonSelectValue(participantLessonEndSelect, end || DEFAULT_LESSON_END, DEFAULT_LESSON_END);
+    } else {
+      if (participantLessonStartSelect) participantLessonStartSelect.value = '';
+      if (participantLessonEndSelect) participantLessonEndSelect.value = '';
+    }
+    setLessonControlsEnabled(Boolean(enabled));
+    updateLessonCardActiveState();
+  };
+
+  const setLessonSelectValue = (select, value, fallback) => {
+    if (!select) return;
+    const normalized = normalizeLessonTime(value) || fallback;
+    const option = Array.from(select.options).find((item) => item.value === normalized);
+    if (option) {
+      select.value = normalized;
+    } else if (select.options.length) {
+      select.selectedIndex = 0;
+    }
+  };
+
+  const setLessonControlsEnabled = (enabled) => {
+    isLessonControlsEnabled = Boolean(enabled);
+    const isInteractive = isLessonControlsEnabled && !isReadOnlyMode;
+    if (participantLessonStartSelect) {
+      participantLessonStartSelect.disabled = !isInteractive;
+    }
+    if (participantLessonEndSelect) {
+      participantLessonEndSelect.disabled = !isInteractive;
+    }
+    if (participantLessonToggleBtn) {
+      participantLessonToggleBtn.textContent = isLessonControlsEnabled ? '레슨 비활성화' : '레슨 활성화';
+      participantLessonToggleBtn.setAttribute('aria-pressed', String(isLessonControlsEnabled));
+      participantLessonToggleBtn.classList.toggle('is-active', isLessonControlsEnabled);
+    }
+    participantLessonCardEl?.classList.toggle('lesson-disabled', !isLessonControlsEnabled);
+  };
+
+  const getDetailLessonTimeSelection = () => {
+    if (!isLessonControlsEnabled) {
+      return { enabled: false, start: '', end: '' };
+    }
+    return {
+      enabled: true,
+      start: getLessonTimeValue(participantLessonStartSelect),
+      end: getLessonTimeValue(participantLessonEndSelect),
+    };
+  };
+
+  const getLessonTimeValue = (select) => {
+    if (!select) return '';
+    return normalizeLessonTime(select.value || '');
+  };
+
+  const parseLessonTime = (value) => {
+    const normalized = normalizeLessonTime(value);
+    if (!normalized) return null;
+    const [hours, minutes] = normalized.split(':').map((part) => Number(part));
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+      return null;
+    }
+    const date = new Date();
+    date.setHours(hours, minutes, 0, 0);
+    return date;
+  };
+
+  const isLessonWindowActive = (start, end) => {
+    const startDate = parseLessonTime(start);
+    const endDate = parseLessonTime(end);
+    if (!startDate || !endDate) return false;
+    if (endDate <= startDate) return false;
+    const now = new Date();
+    return now >= startDate && now < endDate;
+  };
+
+  const updateLessonCardActiveState = () => {
+    if (!participantLessonCardEl) return;
+    const { start, end, enabled } = getDetailLessonTimeSelection();
+    const isActive = enabled && isLessonWindowActive(start, end);
+    participantLessonCardEl.classList.toggle('lesson-active', isActive);
+  };
+
+  const refreshLessonIndicators = () => {
+    updateLessonCardActiveState();
+    updateAllParticipantLessonStates();
+  };
+
+  const startLessonStatusWatcher = () => {
+    if (lessonStatusTimer || typeof window === 'undefined') {
+      refreshLessonIndicators();
+      return;
+    }
+    refreshLessonIndicators();
+    lessonStatusTimer = window.setInterval(refreshLessonIndicators, LESSON_STATUS_POLL_INTERVAL);
   };
 
   const handleParticipantDetailKeydown = (event) => {
@@ -563,6 +745,8 @@ const badmintonBoard = (() => {
       participantDetailArrivalEl.textContent = arrivalLabel;
     }
     renderParticipantMatchHistory(participantId);
+    const lessonTimes = getParticipantLessonTimes(participantId);
+    setDetailLessonState(lessonTimes);
     if (!isReadOnlyMode) {
       participantDetailCountInput?.focus();
       participantDetailCountInput?.select();
@@ -598,6 +782,14 @@ const badmintonBoard = (() => {
     setParticipantColor(activeDetailParticipantId, selectedColor);
     const selectedGrade = getDetailGradeValue();
     setParticipantGrade(activeDetailParticipantId, selectedGrade);
+    const lessonSelection = getDetailLessonTimeSelection();
+    setParticipantLessonTimes(
+      activeDetailParticipantId,
+      lessonSelection.start,
+      lessonSelection.end,
+      lessonSelection.enabled,
+    );
+    updateParticipantLessonHighlight(activeDetailParticipantId);
     renderParticipants();
     schedulePersist();
     closeParticipantDetail();
@@ -989,6 +1181,7 @@ const badmintonBoard = (() => {
     if (isReadOnlyMode) {
       disableCardInteractions();
     }
+    updateAllParticipantLessonStates();
   };
 
   const getSortedParticipants = () => {
@@ -1128,6 +1321,50 @@ const badmintonBoard = (() => {
   const getParticipantJoinedAt = (participantId) => {
     const session = getParticipantTodaySession(participantId);
     return session?.joinedAt || null;
+  };
+
+  const getParticipantLessonTimes = (participantId) => {
+    const session = getParticipantTodaySession(participantId);
+    if (!session) {
+      return { start: '', end: '', enabled: false };
+    }
+    session.lessonStart = normalizeLessonTime(session.lessonStart);
+    session.lessonEnd = normalizeLessonTime(session.lessonEnd);
+    session.lessonEnabled = normalizeLessonEnabled(session.lessonEnabled);
+    return { start: session.lessonStart, end: session.lessonEnd, enabled: session.lessonEnabled };
+  };
+
+  const setParticipantLessonTimes = (participantId, startTime, endTime, enabled) => {
+    const session = getParticipantTodaySession(participantId);
+    if (!session) return;
+    session.lessonEnabled = normalizeLessonEnabled(enabled);
+    if (!session.lessonEnabled) {
+      session.lessonStart = '';
+      session.lessonEnd = '';
+      return;
+    }
+    session.lessonStart = normalizeLessonTime(startTime);
+    session.lessonEnd = normalizeLessonTime(endTime);
+  };
+
+  const isParticipantLessonActive = (participantId) => {
+    const { start, end, enabled } = getParticipantLessonTimes(participantId);
+    if (!enabled) return false;
+    return isLessonWindowActive(start, end);
+  };
+
+  const updateParticipantLessonHighlight = (participantId) => {
+    if (!participantId) return false;
+    const isActive = isParticipantLessonActive(participantId);
+    const nodes = document.querySelectorAll(
+      `.card[data-participant-id="${participantId}"], .wait-card[data-participant-id="${participantId}"]`,
+    );
+    nodes.forEach((node) => node.classList.toggle('lesson-active', isActive));
+    return isActive;
+  };
+
+  const updateAllParticipantLessonStates = () => {
+    participants.forEach((member) => updateParticipantLessonHighlight(member.id));
   };
 
   const syncParticipantCards = (participantId) => {
@@ -1814,6 +2051,10 @@ const badmintonBoard = (() => {
     if (slotPickerActiveSlot === slot) {
       closeSlotParticipantPicker();
     }
+    const participantId = card.dataset.participantId;
+    if (participantId) {
+      updateParticipantLessonHighlight(participantId);
+    }
     schedulePersist();
   };
 
@@ -2465,6 +2706,10 @@ const badmintonBoard = (() => {
     slot.appendChild(card);
     if (slotPickerActiveSlot === slot) {
       closeSlotParticipantPicker();
+    }
+    const participantId = card.dataset.participantId;
+    if (participantId) {
+      updateParticipantLessonHighlight(participantId);
     }
     schedulePersist();
   };
