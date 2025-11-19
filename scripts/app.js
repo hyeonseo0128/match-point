@@ -111,6 +111,8 @@ const badmintonBoard = (() => {
   const STATE_API_ENDPOINT = '/api/state';
   const STATE_STREAM_ENDPOINT = '/api/stream';
   const CAPABILITIES_ENDPOINT = '/api/capabilities';
+  const VIEWER_MODE_TITLE = '매치포인트 게임판';
+  const EDITOR_MODE_TITLE = '매치포인트 게임판-운영진';
   const history = {};
   let isReadOnlyMode = false;
   let isRestoringState = false;
@@ -207,6 +209,11 @@ const badmintonBoard = (() => {
       console.error('사용 권한 정보를 불러오지 못했습니다.', error);
       return { readOnly: false };
     }
+  };
+
+  const applyModeSpecificBranding = () => {
+    if (typeof document === 'undefined') return;
+    document.title = isReadOnlyMode ? VIEWER_MODE_TITLE : EDITOR_MODE_TITLE;
   };
 
   const applyReadOnlyUiState = () => {
@@ -377,6 +384,7 @@ const badmintonBoard = (() => {
 
     const capabilities = await loadCapabilities();
     isReadOnlyMode = Boolean(capabilities?.readOnly);
+    applyModeSpecificBranding();
     if (isReadOnlyMode) {
       document.body?.classList.add('read-only-mode');
     }
