@@ -865,7 +865,9 @@ const badmintonBoard = (() => {
     }
     renderSlotParticipantOptions();
     requestAnimationFrame(() => {
-      slotPickerSearchInput?.focus();
+      if (!focusSlotPickerDefaultItem()) {
+        slotPickerSearchInput?.focus();
+      }
     });
     if (!wasOpen) {
       lockModalScroll();
@@ -914,6 +916,14 @@ const badmintonBoard = (() => {
       slotPickerListEl.appendChild(item);
     });
     slotPickerEmptyMessageEl?.classList.toggle('is-visible', matches.length === 0);
+  };
+
+  const focusSlotPickerDefaultItem = () => {
+    if (!slotPickerListEl) return false;
+    const firstItem = slotPickerListEl.querySelector('.slot-picker-item');
+    if (!firstItem) return false;
+    firstItem.focus();
+    return true;
   };
 
   const handleSlotPickerSearchInput = (event) => {
