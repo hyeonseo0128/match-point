@@ -614,7 +614,7 @@ const badmintonBoard = (() => {
       participantLessonEndSelect.disabled = !isInteractive;
     }
     if (participantLessonToggleBtn) {
-      participantLessonToggleBtn.textContent = isLessonControlsEnabled ? '레슨 비활성화' : '레슨 활성화';
+      participantLessonToggleBtn.textContent = isLessonControlsEnabled ? '레슨 시간 설정' : '레슨 시간 설정';
       participantLessonToggleBtn.setAttribute('aria-pressed', String(isLessonControlsEnabled));
       participantLessonToggleBtn.classList.toggle('is-active', isLessonControlsEnabled);
     }
