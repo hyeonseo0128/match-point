@@ -1515,30 +1515,30 @@ const badmintonBoard = (() => {
   };
 
   const attachNameResetHold = (target, participantId) => {
-    let holdTimer = null;
+    // let holdTimer = null;
 
-    const clearHold = () => {
-      if (holdTimer) {
-        window.clearTimeout(holdTimer);
-        holdTimer = null;
-      }
-    };
+    // const clearHold = () => {
+    //   if (holdTimer) {
+    //     window.clearTimeout(holdTimer);
+    //     holdTimer = null;
+    //   }
+    // };
 
-    const startHold = (event) => {
-      if (event.button && event.button !== 0) return;
-      if (getParticipantStatus(participantId) === 'pending') return;
-      clearHold();
-      holdTimer = window.setTimeout(() => {
-        holdTimer = null;
-        markParticipantPending(participantId);
-      }, NAME_RESET_HOLD_DURATION);
-    };
+    // const startHold = (event) => {
+    //   if (event.button && event.button !== 0) return;
+    //   if (getParticipantStatus(participantId) === 'pending') return;
+    //   clearHold();
+    //   holdTimer = window.setTimeout(() => {
+    //     holdTimer = null;
+    //     markParticipantPending(participantId);
+    //   }, NAME_RESET_HOLD_DURATION);
+    // };
 
-    target.addEventListener('pointerdown', startHold);
-    target.addEventListener('pointerup', clearHold);
-    target.addEventListener('pointerleave', clearHold);
-    target.addEventListener('pointercancel', clearHold);
-    target.addEventListener('dragstart', clearHold);
+    // target.addEventListener('pointerdown', startHold);
+    // target.addEventListener('pointerup', clearHold);
+    // target.addEventListener('pointerleave', clearHold);
+    // target.addEventListener('pointercancel', clearHold);
+    // target.addEventListener('dragstart', clearHold);
   };
 
   const handleHardReset = async () => {
