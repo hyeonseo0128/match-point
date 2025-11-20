@@ -1069,11 +1069,7 @@ const badmintonBoard = (() => {
       slotPickerSearchInput.value = '';
     }
     renderSlotParticipantOptions();
-    requestAnimationFrame(() => {
-      if (!focusSlotPickerDefaultItem()) {
-        slotPickerSearchInput?.focus();
-      }
-    });
+    // focus intentionally left idle to avoid auto-selecting search input
     if (!wasOpen) {
       lockModalScroll();
     }
@@ -1118,17 +1114,12 @@ const badmintonBoard = (() => {
       meta.textContent = formatTodayCount(getParticipantTodayCount(member.id));
       item.appendChild(name);
       item.appendChild(meta);
+      if (isParticipantOnBoard(member.id)) {
+        item.classList.add('is-playing');
+      }
       slotPickerListEl.appendChild(item);
     });
     slotPickerEmptyMessageEl?.classList.toggle('is-visible', matches.length === 0);
-  };
-
-  const focusSlotPickerDefaultItem = () => {
-    if (!slotPickerListEl) return false;
-    const firstItem = slotPickerListEl.querySelector('.slot-picker-item');
-    if (!firstItem) return false;
-    firstItem.focus();
-    return true;
   };
 
   const handleSlotPickerSearchInput = (event) => {
@@ -1195,6 +1186,7 @@ const badmintonBoard = (() => {
       disableCardInteractions();
     }
     updateAllParticipantLessonStates();
+    updateAllParticipantBoardHighlights();
     const restore = () => restoreWindowScrollTop(previousScrollTop);
     if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
       window.requestAnimationFrame(restore);
@@ -1384,6 +1376,22 @@ const badmintonBoard = (() => {
 
   const updateAllParticipantLessonStates = () => {
     participants.forEach((member) => updateParticipantLessonHighlight(member.id));
+  };
+
+  const isParticipantOnBoard = (participantId) => {
+    if (!boardEl || !participantId) return false;
+    return Boolean(boardEl.querySelector(`.slot .card.on-board[data-participant-id="${participantId}"]`));
+  };
+
+  const updateParticipantBoardHighlight = (participantId) => {
+    if (!participantId) return;
+    const isOnBoard = isParticipantOnBoard(participantId);
+    const listCards = document.querySelectorAll(`.participants-list .card[data-participant-id="${participantId}"]`);
+    listCards.forEach((card) => card.classList.toggle('is-playing', isOnBoard));
+  };
+
+  const updateAllParticipantBoardHighlights = () => {
+    participants.forEach((member) => updateParticipantBoardHighlight(member.id));
   };
 
   const syncParticipantCards = (participantId) => {
@@ -2755,6 +2763,7 @@ const badmintonBoard = (() => {
     const participantId = card.dataset.participantId;
     if (participantId) {
       updateParticipantLessonHighlight(participantId);
+      updateParticipantBoardHighlight(participantId);
     }
     schedulePersist();
   };
@@ -2769,7 +2778,11 @@ const badmintonBoard = (() => {
   const removeBoardCard = (card) => {
     freeSlot(card);
     card.dataset.previousSlotId = '';
+    const participantId = card.dataset.participantId;
     card.remove();
+    if (participantId) {
+      updateParticipantBoardHighlight(participantId);
+    }
     schedulePersist();
   };
 

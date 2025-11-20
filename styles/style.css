@@ -729,6 +729,15 @@ body.modal-scroll-locked{
 .participants-list .card{
   width:100%;
 }
+.participants-list .card.is-playing{
+  border-color:rgba(37,99,235,0.9)!important;
+  box-shadow:0 0 0 3px rgba(37,99,235,0.35),0 15px 32px rgba(37,99,235,0.25);
+  animation:playingGlow 1.4s ease-in-out infinite;
+}
+.participants-list .card.is-playing .name,
+.participants-list .card.is-playing .today-count{
+  color:#1d4ed8;
+}
 .participants-list .card-actions.card-actions-inline{
   flex-direction:row;
   align-items:center;
@@ -1175,6 +1184,17 @@ body.modal-scroll-locked{
   opacity:0.6;
   cursor:not-allowed;
 }
+@keyframes playingGlow{
+  0%{
+    box-shadow:0 0 0 0 rgba(37,99,235,0.45);
+  }
+  70%{
+    box-shadow:0 0 0 8px rgba(37,99,235,0);
+  }
+  100%{
+    box-shadow:0 0 0 0 rgba(37,99,235,0);
+  }
+}
 @keyframes lessonPulse{
   0%{
     box-shadow:0 0 0 0 rgba(250,204,21,0.6);
@@ -1302,6 +1322,14 @@ body.modal-scroll-locked{
   cursor:pointer;
   background:#fff;
   transition:border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+.slot-picker-item.is-playing{
+  border-color:rgba(37,99,235,0.9);
+  box-shadow:0 0 0 2px rgba(37,99,235,0.25);
+  color:#1d4ed8;
+}
+.slot-picker-item.is-playing .slot-picker-item-meta{
+  color:#1d4ed8;
 }
 .slot-picker-item:focus{
   outline:none;
