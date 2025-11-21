@@ -22,11 +22,12 @@
             <h2>배드민턴 코트</h2>
             <p>코트를 추가하고 참가자를 드래그해서 원하는 위치에 배치하세요.</p>
           </div>
-        <div class="board-actions">
-          <button id="addCourtBtn" class="btn secondary" type="button">코트 추가</button>
-          <button id="resetBoardBtn" class="btn" type="button">배치 초기화</button>
+          <div class="board-actions">
+            <a id="gameHistoryLink" class="btn ghost" role="button" href="./history.html">게임 기록</a>
+            <button id="addCourtBtn" class="btn secondary" type="button">코트 추가</button>
+            <button id="resetBoardBtn" class="btn" type="button">배치 초기화</button>
+          </div>
         </div>
-      </div>
       <div class="game-board" id="gameBoard" aria-label="게임판"></div>
       <div class="waitlist-area" aria-label="배드민턴 코트 대기자 목록">
         <div class="waitlist-header">
@@ -39,6 +40,11 @@
           </div>
         </div>
         <div id="waitlistRows" class="waitlist-rows" aria-live="polite"></div>
+        <div class="waitlist-import-cta">
+          <button id="waitlistImportBtn" class="btn ghost" type="button">대기열 불러오기 (.txt)</button>
+          <p class="waitlist-import-hint">대기열.txt 파일을 업로드하면 대기열과 참가자 목록이 자동으로 채워집니다.</p>
+          <input id="waitlistFileInput" type="file" accept=".txt" hidden />
+        </div>
       </div>
       <p class="board-hint">추가한 코트 위 아무 곳이나 카드를 내려놓으면 배치됩니다.</p>
       </section>

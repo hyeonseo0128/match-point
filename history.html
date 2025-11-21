@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>매치포인트 게임 기록</title>
+  <link rel="stylesheet" href="./styles/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+</head>
+<body class="history-page">
+  <header class="topbar">
+    <div class="brand" aria-label="매치 포인트 로고">
+      <img src="./assets/image/match_point_logo2.png" alt="매치 포인트 로고" class="brand-logo" />
+    </div>
+  </header>
+
+  <main class="container history-container">
+    <section class="history-hero" aria-label="게임 기록 소개">
+      <div>
+        <p class="history-hero-label">오늘의 매치</p>
+        <h1>게임 기록 보드</h1>
+        <p class="history-hero-description">
+          운영진과 뷰어가 매치 진행 상황과 결과를 한눈에 확인하고 관리할 수 있는 페이지입니다.
+        </p>
+      </div>
+      <div class="history-hero-actions">
+        <a class="btn ghost" href="./index.html" role="button">보드로 돌아가기</a>
+      </div>
+    </section>
+
+    <section class="history-table-section" aria-label="오늘 경기 기록">
+      <div class="history-table-header">
+        <h2>오늘 경기 기록</h2>
+        <div class="history-table-summary">
+          <div class="history-team-score" data-team-score="A">
+            <span class="history-team-score-label">팀 매치 우승</span>
+            <span class="history-team-score-value" id="summaryTeamAWins">0</span>회
+          </div>
+          <div class="history-team-score" data-team-score="B">
+            <span class="history-team-score-label">팀 포인트 우승</span>
+            <span class="history-team-score-value" id="summaryTeamBWins">0</span>회
+          </div>
+        </div>
+        <button class="btn secondary" type="button">CSV 다운로드</button>
+      </div>
+      <div class="history-table-wrapper" role="region" aria-live="polite">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th scope="col">시간</th>
+              <th scope="col">코트</th>
+              <th scope="col">팀 매치</th>
+              <th scope="col">팀 포인트</th>
+              <th scope="col">점수</th>
+              <th scope="col">메모</th>
+              <th scope="col">관리</th>
+            </tr>
+          </thead>
+          <tbody id="historyTableBody">
+            <tr data-empty-row="true">
+              <td colspan="7" class="history-table-empty">
+                아직 기록이 없습니다. 경기가 끝나면 결과를 남겨 주세요.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <script src="./scripts/history.js"></script>
+</body>
+</html>

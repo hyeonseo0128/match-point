@@ -108,6 +108,54 @@ const badmintonBoard = (() => {
     });
   };
   normalizeParticipants();
+  const MAX_GAME_RECORDS = 200;
+  const normalizeGameRecordParticipant = (entry) => {
+    if (!entry || typeof entry !== 'object') return null;
+    return {
+      id: entry.id || '',
+      name: entry.name || '이름 미상',
+      color: normalizeParticipantColor(entry.color),
+      grade: normalizeParticipantGrade(entry.grade),
+    };
+  };
+  const normalizeGameRecordScoreValue = (value) => {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return null;
+    return Math.max(0, Math.floor(parsed));
+  };
+  const normalizeGameRecordScore = (score) => {
+    const source = score && typeof score === 'object' ? score : {};
+    return {
+      A: normalizeGameRecordScoreValue(source.A),
+      B: normalizeGameRecordScoreValue(source.B),
+    };
+  };
+  const normalizeGameRecord = (record) => {
+    if (!record || typeof record !== 'object') return null;
+    const teams = record.teams || {};
+    const normalizeTeam = (entries) => {
+      if (!Array.isArray(entries)) return [];
+      return entries.map((entry) => normalizeGameRecordParticipant(entry)).filter(Boolean);
+    };
+    return {
+      id: record.id || `game-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      courtNumber: Number(record.courtNumber) || null,
+      completedAt: record.completedAt || new Date().toISOString(),
+      teams: {
+        A: normalizeTeam(teams.A),
+        B: normalizeTeam(teams.B),
+      },
+      score: normalizeGameRecordScore(record.score),
+      notes: typeof record.notes === 'string' ? record.notes : '',
+    };
+  };
+  const normalizeGameRecords = (records = []) => {
+    if (!Array.isArray(records)) return [];
+    const normalized = records.map((record) => normalizeGameRecord(record)).filter(Boolean);
+    return normalized.slice(0, MAX_GAME_RECORDS);
+  };
+  const createParticipantId = () => `p-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const getGradeBadgeImage = (grade) => {
     const normalized = normalizeParticipantGrade(grade);
     return PARTICIPANT_GRADE_IMAGES[normalized] || PARTICIPANT_GRADE_IMAGES[DEFAULT_PARTICIPANT_GRADE];
@@ -133,6 +181,7 @@ const badmintonBoard = (() => {
   const VIEWER_MODE_TITLE = '매치포인트 게임판';
   const EDITOR_MODE_TITLE = '매치포인트 게임판-운영진';
   const history = {};
+  let gameRecords = [];
   let isReadOnlyMode = false;
   let isRestoringState = false;
   let saveTimer = null;
@@ -147,6 +196,8 @@ const badmintonBoard = (() => {
   let downloadHistoryBtn;
   let waitlistRowsEl;
   let addWaitlistRowBtn;
+  let waitlistImportBtn;
+  let waitlistFileInput;
   let participantDetailModal;
   let participantDetailNameEl;
   let participantDetailArrivalEl;
@@ -303,6 +354,10 @@ const badmintonBoard = (() => {
     disableElement(addCourtBtn);
     disableElement(resetBtn);
     disableElement(addWaitlistRowBtn);
+    disableElement(waitlistImportBtn);
+    if (waitlistFileInput) {
+      waitlistFileInput.disabled = true;
+    }
     disableElement(hardResetBtn);
     if (participantNameInput) {
       participantNameInput.disabled = true;
@@ -338,6 +393,7 @@ const badmintonBoard = (() => {
     participants.length = 0;
     normalizeParticipants();
     clearHistorySnapshot();
+    gameRecords = [];
     renderParticipants();
     clearWaitlistUI();
     clearBoardUI();
@@ -365,6 +421,7 @@ const badmintonBoard = (() => {
     }
     normalizeParticipants();
     participantSortMode = state.participantSortMode || DEFAULT_PARTICIPANT_SORT_MODE;
+    gameRecords = normalizeGameRecords(state.gameRecords);
     clearHistorySnapshot();
     if (state.history) {
       Object.entries(state.history).forEach(([key, value]) => {
@@ -471,6 +528,8 @@ const badmintonBoard = (() => {
     addParticipantBtn = document.getElementById('addParticipantBtn');
     waitlistRowsEl = document.getElementById('waitlistRows');
     addWaitlistRowBtn = document.getElementById('addWaitlistRowBtn');
+    waitlistImportBtn = document.getElementById('waitlistImportBtn');
+    waitlistFileInput = document.getElementById('waitlistFileInput');
     hardResetBtn = document.getElementById('hardResetBtn');
     downloadHistoryBtn = document.getElementById('downloadHistoryBtn');
     participantDetailModal = document.getElementById('participantDetailModal');
@@ -518,6 +577,8 @@ const badmintonBoard = (() => {
       resetBtn?.addEventListener('click', resetBoardPositions);
       addParticipantBtn?.addEventListener('click', handleAddParticipant);
       addWaitlistRowBtn?.addEventListener('click', handleAddWaitlistRow);
+      waitlistImportBtn?.addEventListener('click', handleWaitlistImportClick);
+      waitlistFileInput?.addEventListener('change', handleWaitlistFileChange);
       hardResetBtn?.addEventListener('click', handleHardReset);
       participantNameInput?.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
@@ -1768,6 +1829,7 @@ const badmintonBoard = (() => {
       courts: [],
       waitlist: [],
       history: JSON.parse(JSON.stringify(history)),
+      gameRecords: JSON.parse(JSON.stringify(gameRecords)),
       participantSortMode,
     };
 
@@ -2153,6 +2215,146 @@ const badmintonBoard = (() => {
     schedulePersist();
   };
 
+  const parseWaitlistFileContent = (text = '') => {
+    if (!text) return [];
+    const lines = text.split(/\r?\n/);
+    const groups = [];
+    lines.forEach((rawLine) => {
+      const line = rawLine.trim();
+      if (!line) return;
+      const sanitized = line.replace(/^\s*\d+\s*/, '').trim();
+      if (!sanitized) return;
+      const tokens = sanitized.split(/\s+/).filter(Boolean);
+      if (!tokens.length) return;
+      for (let index = 0; index < tokens.length; index += 4) {
+        groups.push(tokens.slice(index, index + 4));
+      }
+    });
+    return groups;
+  };
+
+  const ensureParticipantForName = (rawName) => {
+    const name = (rawName || '').trim();
+    if (!name) return null;
+    let participant = participants.find((member) => member.name === name);
+    if (participant) return participant;
+    const newParticipant = {
+      id: createParticipantId(),
+      name,
+      color: 'blue',
+      status: 'pending',
+      grade: DEFAULT_PARTICIPANT_GRADE,
+      sessions: {},
+    };
+    participants.push(newParticipant);
+    setParticipantJoinedAt(newParticipant.id, new Date());
+    return newParticipant;
+  };
+
+  const decodeWaitlistBuffer = (buffer) => {
+    if (typeof TextDecoder === 'undefined') return null;
+    const attempts = [
+      { label: 'utf-8', allowReplacement: false },
+      { label: 'euc-kr', allowReplacement: true },
+    ];
+    for (const attempt of attempts) {
+      try {
+        const decoder = new TextDecoder(attempt.label, { fatal: !attempt.allowReplacement });
+        const text = decoder.decode(buffer);
+        if (!text) continue;
+        if (!attempt.allowReplacement && text.includes('�')) {
+          continue;
+        }
+        return text;
+      } catch (error) {
+        console.error(`Failed to decode waitlist file with ${attempt.label}`, error);
+      }
+    }
+    return null;
+  };
+
+  const readWaitlistFileAsText = async (file) => {
+    if (!file) return '';
+    try {
+      if (typeof file.arrayBuffer === 'function') {
+        const buffer = await file.arrayBuffer();
+        const decoded = decodeWaitlistBuffer(buffer);
+        if (decoded !== null) {
+          return decoded;
+        }
+      }
+    } catch (error) {
+      console.error('대기열 파일을 읽지 못했습니다.', error);
+    }
+    if (typeof file.text === 'function') {
+      return file.text();
+    }
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('대기열 파일을 읽지 못했습니다.'));
+      reader.onload = () => resolve(reader.result || '');
+      reader.readAsText(file, 'utf-8');
+    });
+  };
+
+  const buildWaitlistFromGroups = (groups) => {
+    if (!waitlistRowsEl) return;
+    const prevRestoring = isRestoringState;
+    isRestoringState = true;
+    try {
+      clearWaitlistUI();
+      if (Array.isArray(groups) && groups.length) {
+        groups.forEach((names) => {
+          const row = addWaitlistRow();
+          const slots = row?.querySelectorAll('.waitlist-slot') || [];
+          names.forEach((name, index) => {
+            const participant = ensureParticipantForName(name);
+            if (!participant) return;
+            const slot = slots[index];
+            if (!slot) return;
+            const waitCard = createWaitlistCard(participant);
+            placeWaitlistCardInSlot(waitCard, slot);
+          });
+        });
+      } else {
+        addWaitlistRow();
+      }
+    } finally {
+      isRestoringState = prevRestoring;
+    }
+    renderParticipants();
+    schedulePersist();
+  };
+
+  const handleWaitlistImportClick = () => {
+    if (!waitlistFileInput) return;
+    waitlistFileInput.value = '';
+    waitlistFileInput.click();
+  };
+
+  const handleWaitlistFileChange = async (event) => {
+    const input = event.target;
+    const file = input?.files?.[0];
+    if (!file) return;
+    try {
+      const content = await readWaitlistFileAsText(file);
+      const groups = parseWaitlistFileContent(content);
+      if (!groups.length) {
+        window.alert('대기열 정보를 찾지 못했습니다.');
+        return;
+      }
+      buildWaitlistFromGroups(groups);
+      window.alert(`대기열 ${groups.length}개를 불러왔습니다.`);
+    } catch (error) {
+      console.error('대기열 파일을 처리하지 못했습니다.', error);
+      window.alert('대기열 파일을 처리하지 못했습니다.');
+    } finally {
+      if (input) {
+        input.value = '';
+      }
+    }
+  };
+
   const cleanupWaitlistRowIfEmpty = (row) => {
     if (!row) return;
     if (row.querySelector('.wait-card')) return;
@@ -2227,6 +2429,48 @@ const badmintonBoard = (() => {
     }
   };
 
+  const buildCourtGameRecord = (court) => {
+    if (!court) return null;
+    const slots = [...court.querySelectorAll('.slot')];
+    if (!slots.length) return null;
+    const teams = { A: [], B: [] };
+    slots.forEach((slot, index) => {
+      const occupantId = slot.dataset.occupantId;
+      if (!occupantId) return;
+      const card = document.getElementById(occupantId);
+      const participantId = card?.dataset.participantId;
+      if (!participantId) return;
+      const participant = getParticipantById(participantId);
+      if (!participant) return;
+      const participantEntry = {
+        id: participant.id,
+        name: participant.name,
+        color: participant.color,
+        grade: participant.grade,
+      };
+      if (index < 2) {
+        teams.A.push(participantEntry);
+      } else {
+        teams.B.push(participantEntry);
+      }
+    });
+    if (!teams.A.length && !teams.B.length) return null;
+    return normalizeGameRecord({
+      id: `game-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      courtNumber: Number(court.dataset.number) || null,
+      completedAt: new Date().toISOString(),
+      teams,
+      score: { A: null, B: null },
+      notes: '',
+    });
+  };
+
+  const addCourtGameRecord = (court) => {
+    const record = buildCourtGameRecord(court);
+    if (!record) return;
+    gameRecords = [record, ...gameRecords].slice(0, MAX_GAME_RECORDS);
+  };
+
   const handleCourtGameComplete = (court) => {
     if (!court) return;
     const slots = [...court.querySelectorAll('.slot')];
@@ -2246,6 +2490,7 @@ const badmintonBoard = (() => {
       return;
     }
     recordCourtMatchHistory(participants.map(({ participantId }) => participantId));
+    addCourtGameRecord(court);
     participants.forEach(({ card }) => {
       removeBoardCard(card);
     });
@@ -2514,7 +2759,7 @@ const badmintonBoard = (() => {
     const color = getSelectedColor();
     const grade = getSelectedGrade();
     const newParticipant = {
-      id: `p${Date.now()}`,
+      id: createParticipantId(),
       name,
       color,
       status: 'pending',
