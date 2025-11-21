@@ -24,8 +24,7 @@ body{
   flex-direction:column;
 }
 
-html.modal-scroll-locked,
-body.modal-scroll-locked{
+html.modal-scroll-locked{
   overflow:hidden;
 }
 
@@ -358,8 +357,13 @@ body.modal-scroll-locked{
 }
 .wait-card.lesson-active{
   border-color:#facc15!important;
-  box-shadow:0 0 0 2px rgba(250,204,21,0.35);
-  animation:lessonPulse 1.2s ease-in-out infinite;
+  background:rgba(250,204,21,0.18);
+  color:#78350f;
+  box-shadow:0 12px 30px rgba(146,64,14,0.3);
+  animation:lessonPulse 1.3s ease-in-out infinite;
+}
+.wait-card.lesson-active .name{
+  color:inherit;
 }
 .wait-card-remove:hover{
   background:rgba(248,113,113,0.85);
@@ -730,13 +734,26 @@ body.modal-scroll-locked{
   width:100%;
 }
 .participants-list .card.is-playing{
-  border-color:rgba(37,99,235,0.9)!important;
-  box-shadow:0 0 0 3px rgba(37,99,235,0.35),0 15px 32px rgba(37,99,235,0.25);
-  animation:playingGlow 1.4s ease-in-out infinite;
+  border-color:rgba(37,99,235,0.95)!important;
+  background:rgba(37,99,235,0.94);
+  color:#fff;
+  box-shadow:0 12px 30px rgba(15,23,42,0.4);
+  animation:playingGlow 1.5s ease-in-out infinite;
 }
 .participants-list .card.is-playing .name,
+.participants-list .card.is-playing .today-count,
+.participants-list .card.is-playing .card-actions button{
+  color:#fff;
+}
 .participants-list .card.is-playing .today-count{
-  color:#1d4ed8;
+  opacity:0.9;
+}
+.participants-list .card.is-playing .card-actions button{
+  background:rgba(255,255,255,0.18);
+  border-color:rgba(255,255,255,0.4);
+}
+.participants-list .card.is-playing .card-actions button:hover{
+  background:rgba(255,255,255,0.28);
 }
 .participants-list .card-actions.card-actions-inline{
   flex-direction:row;
@@ -802,11 +819,30 @@ body.modal-scroll-locked{
 }
 .card.lesson-active{
   border-color:#facc15!important;
-  box-shadow:0 0 0 3px rgba(250,204,21,0.35),0 15px 30px rgba(250,204,21,0.25);
-  animation:lessonPulse 1.2s ease-in-out infinite;
+  background:rgba(250,204,21,0.16);
+  color:#78350f;
+  box-shadow:0 18px 36px rgba(146,64,14,0.25);
+  animation:lessonPulse 1.4s ease-in-out infinite;
+}
+.card.lesson-active .name,
+.card.lesson-active .today-count{
+  color:inherit;
+}
+.card.lesson-active .card-actions button{
+  background:rgba(249,250,196,0.35);
+  border-color:rgba(217,119,6,0.25);
+  color:#78350f;
+}
+.card.lesson-active .card-actions button:hover{
+  background:rgba(253,230,138,0.6);
 }
 .card.on-board.lesson-active{
-  background:rgba(250,204,21,0.15);
+  background:rgba(250,204,21,0.35);
+  color:#0f172a;
+  box-shadow:0 20px 45px rgba(146,64,14,0.3);
+}
+.card.on-board.lesson-active .name{
+  color:inherit;
 }
 .card.card-submitted{
   animation:none;
@@ -1186,23 +1222,29 @@ body.modal-scroll-locked{
 }
 @keyframes playingGlow{
   0%{
+    background:rgba(37,99,235,0.96);
     box-shadow:0 0 0 0 rgba(37,99,235,0.45);
   }
   70%{
-    box-shadow:0 0 0 8px rgba(37,99,235,0);
+    background:rgba(59,130,246,0.85);
+    box-shadow:0 0 0 12px rgba(37,99,235,0);
   }
   100%{
+    background:rgba(37,99,235,0.96);
     box-shadow:0 0 0 0 rgba(37,99,235,0);
   }
 }
 @keyframes lessonPulse{
   0%{
-    box-shadow:0 0 0 0 rgba(250,204,21,0.6);
+    background:rgba(250,204,21,0.2);
+    box-shadow:0 0 0 0 rgba(250,204,21,0.45);
   }
   70%{
-    box-shadow:0 0 0 10px rgba(250,204,21,0);
+    background:rgba(253,224,71,0.38);
+    box-shadow:0 0 0 14px rgba(250,204,21,0);
   }
   100%{
+    background:rgba(250,204,21,0.2);
     box-shadow:0 0 0 0 rgba(250,204,21,0);
   }
 }
@@ -1324,12 +1366,14 @@ body.modal-scroll-locked{
   transition:border-color .18s ease, box-shadow .18s ease, transform .18s ease;
 }
 .slot-picker-item.is-playing{
-  border-color:rgba(37,99,235,0.9);
-  box-shadow:0 0 0 2px rgba(37,99,235,0.25);
-  color:#1d4ed8;
+  border-color:rgba(37,99,235,0.95);
+  background:rgba(37,99,235,0.92);
+  color:#fff;
+  box-shadow:0 12px 25px rgba(15,23,42,0.3);
+  animation:playingGlow 1.5s ease-in-out infinite;
 }
 .slot-picker-item.is-playing .slot-picker-item-meta{
-  color:#1d4ed8;
+  color:rgba(255,255,255,0.88);
 }
 .slot-picker-item:focus{
   outline:none;

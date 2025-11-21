@@ -187,18 +187,31 @@ const badmintonBoard = (() => {
   const MODAL_SCROLL_LOCK_CLASS = 'modal-scroll-locked';
   let modalScrollLockCount = 0;
   let modalScrollLockScrollTop = 0;
+  let modalScrollLockListScrollTop = 0;
 
   const lockModalScroll = () => {
     modalScrollLockCount += 1;
     if (modalScrollLockCount === 1) {
+      const currentScrollY =
+        window.scrollY || document.documentElement?.scrollTop || document.body?.scrollTop || 0;
+      modalScrollLockScrollTop = currentScrollY;
+      modalScrollLockListScrollTop = participantsListEl?.scrollTop || 0;
       document.documentElement?.classList.add(MODAL_SCROLL_LOCK_CLASS);
       document.body?.classList.add(MODAL_SCROLL_LOCK_CLASS);
-      modalScrollLockScrollTop =
-        window.scrollY || document.documentElement?.scrollTop || document.body?.scrollTop || 0;
       if (document.body) {
         document.body.style.top = `-${modalScrollLockScrollTop}px`;
         document.body.style.position = 'fixed';
         document.body.style.width = '100%';
+      }
+      const restoreListScroll = () => {
+        if (participantsListEl) {
+          participantsListEl.scrollTop = modalScrollLockListScrollTop;
+        }
+      };
+      if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(restoreListScroll);
+      } else {
+        restoreListScroll();
       }
     }
   };
@@ -215,7 +228,13 @@ const badmintonBoard = (() => {
         document.body.style.width = '';
       }
       const targetScroll = modalScrollLockScrollTop;
+      const restoreListScroll = () => {
+        if (participantsListEl) {
+          participantsListEl.scrollTop = modalScrollLockListScrollTop;
+        }
+      };
       requestAnimationFrame(() => {
+        restoreListScroll();
         window.scrollTo(0, targetScroll);
       });
     }
@@ -413,12 +432,32 @@ const badmintonBoard = (() => {
 
   const getWindowScrollTop = () => {
     if (typeof window === 'undefined') return 0;
+    if (modalScrollLockCount > 0) {
+      return modalScrollLockScrollTop;
+    }
     return window.scrollY || document.documentElement?.scrollTop || document.body?.scrollTop || 0;
   };
 
   const restoreWindowScrollTop = (value) => {
     if (typeof window === 'undefined') return;
+    if (modalScrollLockCount > 0) {
+      modalScrollLockScrollTop = value;
+      if (document?.body) {
+        document.body.style.top = `-${modalScrollLockScrollTop}px`;
+      }
+      return;
+    }
     window.scrollTo(0, value);
+  };
+
+  const getParticipantsListScrollTop = () => {
+    if (!participantsListEl) return 0;
+    return participantsListEl.scrollTop || 0;
+  };
+
+  const restoreParticipantsListScrollTop = (value) => {
+    if (!participantsListEl) return;
+    participantsListEl.scrollTop = value;
   };
 
   const init = async () => {
@@ -1167,8 +1206,9 @@ const badmintonBoard = (() => {
   };
 
   const renderParticipants = () => {
-    const previousScrollTop = getWindowScrollTop();
+    const previousWindowScrollTop = getWindowScrollTop();
     if (!participantsListEl) return;
+    const previousListScrollTop = getParticipantsListScrollTop();
     if (participantSortSelect) {
       participantSortSelect.value = participantSortMode;
     }
@@ -1187,7 +1227,10 @@ const badmintonBoard = (() => {
     }
     updateAllParticipantLessonStates();
     updateAllParticipantBoardHighlights();
-    const restore = () => restoreWindowScrollTop(previousScrollTop);
+    const restore = () => {
+      restoreWindowScrollTop(previousWindowScrollTop);
+      restoreParticipantsListScrollTop(previousListScrollTop);
+    };
     if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
       window.requestAnimationFrame(restore);
     } else {
